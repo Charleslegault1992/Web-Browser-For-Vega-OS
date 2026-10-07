@@ -30,6 +30,13 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('consumeNavigationEvent(event)');
   });
 
+  it('cancels scripted same-tab escapes when the Navigation API is available', () => {
+    expect(script).toContain('window.navigation');
+    expect(script).toContain("addEventListener('navigate'");
+    expect(script).toContain('event.destination.url');
+    expect(script).toContain('event.preventDefault()');
+  });
+
   it('blocks external forms from primary pages but leaves same-site forms native', () => {
     expect(script).toContain('submitCreatesNewContext');
     expect(script).toContain('isUnwantedPrimaryPageEscape(action)');
