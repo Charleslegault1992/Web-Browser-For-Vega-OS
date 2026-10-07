@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@amazon-devices/react-native-kepler": "~4.0.0+rn0.83.0",
-    "@amazon-devices/webview": "~4.0.2",
+    "@amazon-devices/webview": "~4.0",
     "react": "19.2.0",
     "react-native": "0.83.0"
   },
