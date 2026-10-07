@@ -16,21 +16,21 @@ Those resources are not denied merely because they are cross-origin.
 ## Layers
 
 1. `window.open` is neutralized before it can create a new context and locked against later reassignment when Chromium permits it.
-2. New-context anchor clicks (`_blank`, `_new`, named targets, `rel=external`) are captured and reported to native code.
-3. New-context form targets are forced into `_self`, including direct `form.submit()` calls.
-4. Dynamic `<base target>` values that would create a second context are normalized to `_self`.
-5. Native policy decides allow / same-window / block for navigation intents.
-6. Vega `onShouldStartLoadWithRequest` must apply `shouldAllowWebViewNavigation()` so JS redirects, `location.assign`, `location.replace`, `top.location`, `parent.location`, ordinary link navigation and server redirects cannot bypass the native policy.
+2. Explicit new-context anchor clicks (`_blank`, `_new`, named targets, `rel=external`) are consumed and ignored.
+3. Explicit new-context form submissions are consumed and ignored, including direct `form.submit()` calls.
+4. `<base target>` is considered when deciding whether a link/form is trying to open another browsing context.
+5. Same-window links/forms are left untouched so ordinary site navigation continues normally.
+6. Vega `onShouldStartLoadWithRequest` must still apply `shouldAllowWebViewNavigation()` so unsafe top-level schemes/redirects cannot bypass native policy.
 7. A small ad-host set is used only for nuisance navigation and targeted blocked-iframe cleanup.
-8. MutationObserver inspects added nodes and only `src`/`target`/`formtarget` attribute mutations; it never periodically rescans the full document.
+8. MutationObserver inspects added nodes and only `src` attribute mutations for targeted iframe cleanup; it never periodically rescans the full document.
 
-## Trusted gesture model
+## New-window behavior
 
-A popup attempt within 1200 ms of a real browser pointer or Enter/Space interaction is considered user-initiated. New-context link clicks additionally use `event.isTrusted`, so a programmatic `element.click()` is not automatically promoted to a trusted popup.
+Kaylane TV is intentionally single-window.
 
-Trusted third-party popups may be reused in the current WebView because legitimate players can live on third-party origins. A known blocked-ad destination is still denied even when a popup claims a trusted gesture.
+A website may call `window.open()` as a side effect of pressing Play. Kaylane TV now ignores that request completely instead of recycling the destination into the current WebView. The guard returns the current `window` object only as a truthy compatibility value so basic popup-blocker detection does not break the page's inline Play behavior.
 
-Untrusted popups are allowed into the current WebView only when they target a primary Kaylane TV host or the exact same origin as the opener. Other untrusted third-party popups are denied.
+Explicit links/forms that request a second browsing context are also consumed and ignored. Same-window navigation is not rewritten.
 
 ## URL / hostname safety
 
@@ -70,8 +70,8 @@ The page guard is idempotent and installs one set of listeners plus one Mutation
 - no `setInterval` polling;
 - no animation-frame work;
 - no permanent whole-document scan;
-- one initial targeted `iframe[src]` / `base[target]` scan;
-- incremental work only for newly added nodes and relevant `src` / `target` / `formtarget` mutations.
+- one initial targeted `iframe[src]` scan;
+- incremental work only for newly added nodes and relevant `src` mutations.
 
 The blocked-host list remains intentionally small and is not evaluated against every network request.
 
@@ -79,10 +79,8 @@ The blocked-host list remains intentionally small and is not evaluated against e
 
 Agent A / Lead integration code must:
 - create `createPageGuardScript()` once and inject it through `injectedJavaScriptBeforeContentLoaded`;
-- pass WebView `onMessage` payloads through `parsePageGuardMessage`;
-- call `decideTopLevelNavigation` for valid popup/new-context messages;
-- for `same-window`, navigate the existing WebView only;
-- for `block`, keep the current page and optionally show lightweight feedback;
+- keep `window.open` and explicit new-context navigation as no-op behavior inside the injected guard;
+- do not recycle popup/new-tab destinations into the current WebView;
 - wire `onShouldStartLoadWithRequest` to `shouldAllowWebViewNavigation(request.url)` so page/server redirects cannot bypass the top-level policy;
 - never use `BLOCKED_AD_NAVIGATION_HOSTS` as a blanket network/subresource denylist.
 
