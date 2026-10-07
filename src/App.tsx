@@ -10,6 +10,7 @@ import {WebView} from '@amazon-devices/webview';
 
 import {APP_CONFIG} from './config';
 import {createPageGuardScript} from './injected/pageGuard';
+import {createPlayerCompatibilityScript} from './injected/playerCompat';
 import {createRemotePointerScript} from './injected/remotePointer';
 import {parsePageGuardMessage} from './navigation/messages';
 import {
@@ -17,13 +18,19 @@ import {
   shouldAllowWebViewNavigation,
 } from './navigation/policy';
 import {useBrowserBackHandler} from './remote/useBrowserBackHandler';
+import {useBrowserMenuHandler} from './remote/useBrowserMenuHandler';
 import {useWebPointerMode} from './remote/useWebPointerMode';
 import {BrowserError} from './ui/BrowserError';
 import {BrowserHome} from './ui/BrowserHome';
 import {BrowserNotice} from './ui/BrowserNotice';
+import {BrowserOptions} from './ui/BrowserOptions';
 
 const PAGE_BOOTSTRAP_SCRIPT =
-  createPageGuardScript() + '\n' + createRemotePointerScript();
+  createPageGuardScript() +
+  '\n' +
+  createRemotePointerScript() +
+  '\n' +
+  createPlayerCompatibilityScript();
 const NOTICE_DURATION_MS = 2500;
 const SOFT_RETRY_DELAY_MS = 1400;
 const MAX_SOFT_RETRIES = 2;
@@ -78,6 +85,7 @@ export const App = () => {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [fatalError, setFatalError] = useState<string | null>(null);
+  const [optionsOpen, setOptionsOpen] = useState(false);
   const [webViewGeneration, setWebViewGeneration] = useState(0);
 
   const source = useMemo(() => ({uri: sourceUrl}), [sourceUrl]);
@@ -87,8 +95,17 @@ export const App = () => {
   }, []);
 
   const {syncMode: syncWebPointerMode} = useWebPointerMode({
-    active: surface === 'browser',
+    active: surface === 'browser' && !optionsOpen,
     injectJavaScript: injectWebPointerJavaScript,
+  });
+
+  const toggleOptions = useCallback(() => {
+    setOptionsOpen(previous => !previous);
+  }, []);
+
+  useBrowserMenuHandler({
+    active: surface === 'browser',
+    onMenu: toggleOptions,
   });
 
   const clearNoticeTimer = useCallback(() => {
@@ -133,6 +150,7 @@ export const App = () => {
       setPreferredHomeUrl(url);
       setNotice(null);
       setFatalError(null);
+      setOptionsOpen(false);
       setCanGoBack(false);
       setSourceUrl(url);
       setWebViewGeneration(previous => previous + 1);
@@ -147,6 +165,7 @@ export const App = () => {
     softRetryCountRef.current = 0;
     setNotice(null);
     setFatalError(null);
+    setOptionsOpen(false);
     setCanGoBack(false);
     setLoading(false);
     setSurface('home');
@@ -157,10 +176,15 @@ export const App = () => {
     webViewRef.current?.goBack();
   }, []);
 
-  const dismissNotice = useCallback(() => {
+  const dismissOverlay = useCallback(() => {
+    if (optionsOpen) {
+      setOptionsOpen(false);
+      return;
+    }
+
     clearNoticeTimer();
     setNotice(null);
-  }, [clearNoticeTimer]);
+  }, [clearNoticeTimer, optionsOpen]);
 
   const retry = useCallback(() => {
     clearSoftRetryTimer();
@@ -173,10 +197,10 @@ export const App = () => {
   }, [clearSoftRetryTimer]);
 
   useBrowserBackHandler({
-    overlayOpen: notice !== null,
+    overlayOpen: optionsOpen || notice !== null,
     canGoBack: surface === 'browser' && canGoBack,
     isAtHome: surface === 'home',
-    dismissOverlay: dismissNotice,
+    dismissOverlay,
     goBack,
     goHome,
   });
@@ -217,6 +241,9 @@ export const App = () => {
       softRetryCountRef.current = 0;
       setLoading(false);
       syncWebPointerMode();
+      webViewRef.current?.injectJavaScript(
+        'window.__KAYLANE_TV_MEDIA_API__ && window.__KAYLANE_TV_MEDIA_API__.rescan(); true;',
+      );
     },
     [clearSoftRetryTimer, syncWebPointerMode, updateCanGoBack],
   );
@@ -289,7 +316,8 @@ export const App = () => {
       });
 
       if (decision.action === 'same-window') {
-        dismissNotice();
+        clearNoticeTimer();
+        setNotice(null);
         webViewRef.current?.injectJavaScript(
           `window.location.assign(${JSON.stringify(decision.url)}); true;`,
         );
@@ -301,7 +329,7 @@ export const App = () => {
         return;
       }
     },
-    [dismissNotice],
+    [clearNoticeTimer],
   );
 
   const handleNavigationRequest = useCallback(
@@ -313,6 +341,23 @@ export const App = () => {
     setLoading(false);
     setFatalError(message);
   }, []);
+
+  const retryPlayer = useCallback(() => {
+    setOptionsOpen(false);
+    webViewRef.current?.injectJavaScript(
+      'window.__KAYLANE_TV_MEDIA_API__ && window.__KAYLANE_TV_MEDIA_API__.retryPlayers(); true;',
+    );
+    showNotice('Relance du lecteur envoyée');
+  }, [showNotice]);
+
+  const reloadCurrentPage = useCallback(() => {
+    setOptionsOpen(false);
+    clearSoftRetryTimer();
+    softRetryCountRef.current = 0;
+    setFatalError(null);
+    setLoading(true);
+    webViewRef.current?.reload();
+  }, [clearSoftRetryTimer]);
 
   if (surface === 'home') {
     return (
@@ -331,6 +376,8 @@ export const App = () => {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         allowJavaScriptInBackground={false}
+        thirdPartyCookiesEnabled={true}
+        mediaPlaybackRequiresUserAction={false}
         mixedContentMode="never"
         allowsDefaultMediaControl={true}
         injectedJavaScriptBeforeContentLoaded={PAGE_BOOTSTRAP_SCRIPT}
@@ -377,6 +424,15 @@ export const App = () => {
       ) : null}
 
       <BrowserNotice message={notice} />
+
+      {optionsOpen ? (
+        <BrowserOptions
+          onRetryPlayer={retryPlayer}
+          onReloadPage={reloadCurrentPage}
+          onHome={goHome}
+          onClose={() => setOptionsOpen(false)}
+        />
+      ) : null}
 
       {fatalError !== null ? (
         <BrowserError
