@@ -10,6 +10,7 @@ import {WebView} from '@amazon-devices/webview';
 
 import {APP_CONFIG} from './config';
 import {createPageGuardScript} from './injected/pageGuard';
+import {createRemotePointerScript} from './injected/remotePointer';
 import {parsePageGuardMessage} from './navigation/messages';
 import {
   decideTopLevelNavigation,
@@ -20,7 +21,8 @@ import {BrowserError} from './ui/BrowserError';
 import {BrowserHome} from './ui/BrowserHome';
 import {BrowserNotice} from './ui/BrowserNotice';
 
-const PAGE_GUARD_SCRIPT = createPageGuardScript();
+const PAGE_BOOTSTRAP_SCRIPT =
+  createPageGuardScript() + '\n' + createRemotePointerScript();
 const NOTICE_DURATION_MS = 2500;
 
 type AppSurface = 'home' | 'browser';
@@ -214,7 +216,7 @@ export const App = () => {
         allowJavaScriptInBackground={false}
         mixedContentMode="never"
         allowsDefaultMediaControl={true}
-        injectedJavaScriptBeforeContentLoaded={PAGE_GUARD_SCRIPT}
+        injectedJavaScriptBeforeContentLoaded={PAGE_BOOTSTRAP_SCRIPT}
         onMessage={handlePageGuardMessage}
         onShouldStartLoadWithRequest={handleNavigationRequest}
         onLoadStart={handleLoadStart}
