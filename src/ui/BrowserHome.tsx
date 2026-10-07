@@ -1,19 +1,24 @@
-import React, {useMemo, useState} from 'react';
+import React, {useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 
+import {resolvePreferredDestinationIndex} from './homeFocusPolicy';
+
 export type HomeDestination = {
+  id: string;
   label: string;
   url: string;
   description: string;
 };
 
-const DEFAULT_DESTINATIONS: readonly HomeDestination[] = [
+export const DEFAULT_HOME_DESTINATIONS: readonly HomeDestination[] = [
   {
+    id: 'movix',
     label: 'Movix',
     url: 'https://movix.luxe/',
     description: 'Ouvrir Movix',
   },
   {
+    id: 'dofuz',
     label: 'Dofuz',
     url: 'https://dofuz.com/',
     description: 'Ouvrir Dofuz',
@@ -42,9 +47,14 @@ const DestinationCard = ({
       onPress={() => onOpen(destination.url)}
       accessibilityRole="button"
       accessibilityLabel={destination.description}
+      accessibilityHint="Appuie sur OK pour ouvrir"
       style={[styles.card, focused && styles.cardFocused]}>
-      <Text style={styles.cardTitle}>{destination.label}</Text>
-      <Text style={styles.cardDescription}>{destination.description}</Text>
+      <Text numberOfLines={1} style={styles.cardTitle}>
+        {destination.label}
+      </Text>
+      <Text numberOfLines={2} style={styles.cardDescription}>
+        {destination.description}
+      </Text>
     </Pressable>
   );
 };
@@ -52,32 +62,38 @@ const DestinationCard = ({
 type Props = {
   onOpen: (url: string) => void;
   destinations?: readonly HomeDestination[];
+  preferredUrl?: string;
 };
 
 export const BrowserHome = ({
   onOpen,
-  destinations = DEFAULT_DESTINATIONS,
+  destinations = DEFAULT_HOME_DESTINATIONS,
+  preferredUrl,
 }: Props) => {
-  const cards = useMemo(
-    () =>
-      destinations.map((destination, index) => (
-        <DestinationCard
-          key={destination.url}
-          destination={destination}
-          preferredFocus={index === 0}
-          onOpen={onOpen}
-        />
-      )),
-    [destinations, onOpen],
+  const preferredIndex = resolvePreferredDestinationIndex(
+    destinations,
+    preferredUrl,
   );
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Kaylane TV</Text>
-      <Text style={styles.subtitle}>
-        Choisis un site avec la manette Fire TV.
-      </Text>
-      <View style={styles.grid}>{cards}</View>
+      <View style={styles.content}>
+        <Text style={styles.title}>Kaylane TV</Text>
+        <Text style={styles.subtitle}>
+          Choisis une destination avec la télécommande.
+        </Text>
+
+        <View style={styles.grid}>
+          {destinations.map((destination, index) => (
+            <DestinationCard
+              key={destination.id}
+              destination={destination}
+              preferredFocus={index === preferredIndex}
+              onOpen={onOpen}
+            />
+          ))}
+        </View>
+      </View>
     </View>
   );
 };
@@ -85,48 +101,60 @@ export const BrowserHome = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#080b10',
-    paddingHorizontal: 52,
-    paddingVertical: 42,
+    justifyContent: 'center',
+    backgroundColor: '#070a0f',
+    paddingHorizontal: 72,
+    paddingVertical: 56,
+  },
+  content: {
+    width: '100%',
+    maxWidth: 1120,
+    alignSelf: 'center',
   },
   title: {
     color: '#ffffff',
-    fontSize: 42,
+    fontSize: 54,
+    lineHeight: 62,
     fontWeight: '700',
+    letterSpacing: 0.4,
   },
   subtitle: {
-    color: '#b8c0cc',
-    fontSize: 22,
+    color: '#b8c2cf',
+    fontSize: 24,
+    lineHeight: 32,
     marginTop: 8,
-    marginBottom: 32,
+    marginBottom: 38,
   },
   grid: {
     flexDirection: 'row',
-    gap: 24,
+    gap: 28,
   },
   card: {
-    width: 300,
-    minHeight: 150,
+    flex: 1,
+    minHeight: 210,
     justifyContent: 'center',
-    borderRadius: 16,
-    borderWidth: 3,
-    borderColor: '#252c36',
-    backgroundColor: '#111722',
-    paddingHorizontal: 28,
-    paddingVertical: 24,
+    borderRadius: 18,
+    borderWidth: 4,
+    borderColor: '#26303d',
+    backgroundColor: '#111823',
+    paddingHorizontal: 34,
+    paddingVertical: 30,
   },
   cardFocused: {
     borderColor: '#ffffff',
-    transform: [{scale: 1.05}],
+    backgroundColor: '#182230',
+    transform: [{scale: 1.025}],
   },
   cardTitle: {
     color: '#ffffff',
-    fontSize: 30,
+    fontSize: 36,
+    lineHeight: 44,
     fontWeight: '700',
   },
   cardDescription: {
-    color: '#b8c0cc',
-    fontSize: 18,
-    marginTop: 8,
+    color: '#c3ccd8',
+    fontSize: 20,
+    lineHeight: 28,
+    marginTop: 10,
   },
 });

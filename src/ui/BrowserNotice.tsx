@@ -12,7 +12,9 @@ export const BrowserNotice = ({message}: Props) => {
 
   return (
     <View pointerEvents="none" style={styles.container}>
-      <Text style={styles.text}>{message}</Text>
+      <Text numberOfLines={3} style={styles.text}>
+        {message}
+      </Text>
     </View>
   );
 };
@@ -20,17 +22,22 @@ export const BrowserNotice = ({message}: Props) => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 32,
-    right: 32,
-    bottom: 32,
+    left: 56,
+    right: 56,
+    bottom: 48,
     alignItems: 'center',
   },
   text: {
+    maxWidth: 960,
     color: '#ffffff',
-    backgroundColor: '#171c24',
-    borderRadius: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    fontSize: 18,
+    backgroundColor: 'rgba(16, 22, 31, 0.96)',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#394657',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    fontSize: 20,
+    lineHeight: 28,
+    textAlign: 'center',
   },
 });

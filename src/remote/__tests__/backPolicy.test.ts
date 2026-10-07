@@ -1,4 +1,8 @@
-import {decideBackAction} from '../backPolicy';
+import {
+  DEFAULT_BACK_DEBOUNCE_MS,
+  decideBackAction,
+  shouldSuppressRepeatedBackPress,
+} from '../backPolicy';
 
 describe('decideBackAction', () => {
   it('closes overlays before changing page history', () => {
@@ -7,6 +11,16 @@ describe('decideBackAction', () => {
         overlayOpen: true,
         canGoBack: true,
         isAtHome: false,
+      }),
+    ).toBe('dismiss-overlay');
+  });
+
+  it('closes an overlay even if home and WebView history are stale', () => {
+    expect(
+      decideBackAction({
+        overlayOpen: true,
+        canGoBack: true,
+        isAtHome: true,
       }),
     ).toBe('dismiss-overlay');
   });
@@ -21,7 +35,7 @@ describe('decideBackAction', () => {
     ).toBe('webview-back');
   });
 
-  it('returns to app home when history is empty', () => {
+  it('returns to app home when browser history is empty', () => {
     expect(
       decideBackAction({
         overlayOpen: false,
@@ -31,7 +45,7 @@ describe('decideBackAction', () => {
     ).toBe('go-home');
   });
 
-  it('lets the system exit from the home screen', () => {
+  it('lets Vega handle Back from home', () => {
     expect(
       decideBackAction({
         overlayOpen: false,
@@ -39,5 +53,47 @@ describe('decideBackAction', () => {
         isAtHome: true,
       }),
     ).toBe('system-default');
+  });
+
+  it('lets Vega handle Back from home even with stale canGoBack=true', () => {
+    expect(
+      decideBackAction({
+        overlayOpen: false,
+        canGoBack: true,
+        isAtHome: true,
+      }),
+    ).toBe('system-default');
+  });
+});
+
+describe('shouldSuppressRepeatedBackPress', () => {
+  it('does not suppress the first handled Back press', () => {
+    expect(shouldSuppressRepeatedBackPress(null, 1_000)).toBe(false);
+  });
+
+  it('suppresses key-repeat inside the debounce window', () => {
+    expect(
+      shouldSuppressRepeatedBackPress(
+        1_000,
+        1_000 + DEFAULT_BACK_DEBOUNCE_MS - 1,
+      ),
+    ).toBe(true);
+  });
+
+  it('allows the next intentional Back at the debounce boundary', () => {
+    expect(
+      shouldSuppressRepeatedBackPress(
+        1_000,
+        1_000 + DEFAULT_BACK_DEBOUNCE_MS,
+      ),
+    ).toBe(false);
+  });
+
+  it('does not suppress when the clock moves backwards', () => {
+    expect(shouldSuppressRepeatedBackPress(2_000, 1_000)).toBe(false);
+  });
+
+  it('can disable debounce without changing Back policy', () => {
+    expect(shouldSuppressRepeatedBackPress(1_000, 1_001, 0)).toBe(false);
   });
 });

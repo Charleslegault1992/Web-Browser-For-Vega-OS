@@ -10,6 +10,8 @@ export type BackAction =
   | 'go-home'
   | 'system-default';
 
+export const DEFAULT_BACK_DEBOUNCE_MS = 180;
+
 export const decideBackAction = ({
   overlayOpen,
   canGoBack,
@@ -19,13 +21,33 @@ export const decideBackAction = ({
     return 'dismiss-overlay';
   }
 
+  // Home must always win over stale WebView history. This makes a rapid
+  // browser -> home transition safe even if canGoBack has not reset yet.
+  if (isAtHome) {
+    return 'system-default';
+  }
+
   if (canGoBack) {
     return 'webview-back';
   }
 
-  if (!isAtHome) {
-    return 'go-home';
+  return 'go-home';
+};
+
+export const shouldSuppressRepeatedBackPress = (
+  lastHandledAtMs: number | null,
+  nowMs: number,
+  debounceMs = DEFAULT_BACK_DEBOUNCE_MS,
+): boolean => {
+  if (
+    lastHandledAtMs === null ||
+    debounceMs <= 0 ||
+    !Number.isFinite(lastHandledAtMs) ||
+    !Number.isFinite(nowMs) ||
+    nowMs < lastHandledAtMs
+  ) {
+    return false;
   }
 
-  return 'system-default';
+  return nowMs - lastHandledAtMs < debounceMs;
 };

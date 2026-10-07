@@ -1,7 +1,10 @@
-import {useEffect} from 'react';
+import {useEffect, useRef} from 'react';
 import {BackHandler} from 'react-native';
 
-import {decideBackAction} from './backPolicy';
+import {
+  decideBackAction,
+  shouldSuppressRepeatedBackPress,
+} from './backPolicy';
 
 export type BrowserBackController = {
   overlayOpen: boolean;
@@ -12,33 +15,57 @@ export type BrowserBackController = {
   goHome: () => void;
 };
 
-export const useBrowserBackHandler = ({
-  overlayOpen,
-  canGoBack,
-  isAtHome,
-  dismissOverlay,
-  goBack,
-  goHome,
-}: BrowserBackController): void => {
+export const useBrowserBackHandler = (
+  controller: BrowserBackController,
+): void => {
+  const controllerRef = useRef(controller);
+  const lastHandledBackAtRef = useRef<number | null>(null);
+
+  // Keep the listener stable for the lifetime of the mounted shell while
+  // always reading the latest navigation state/callbacks.
+  controllerRef.current = controller;
+
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
+        const current = controllerRef.current;
         const action = decideBackAction({
-          overlayOpen,
-          canGoBack,
-          isAtHome,
+          overlayOpen: current.overlayOpen,
+          canGoBack: current.canGoBack,
+          isAtHome: current.isAtHome,
         });
+
+        if (action === 'system-default') {
+          lastHandledBackAtRef.current = null;
+          return false;
+        }
+
+        const now = Date.now();
+
+        // Fire TV key-repeat can deliver multiple Back events before React has
+        // committed the first state transition. Consume that tiny burst so one
+        // press cannot dismiss an overlay and also navigate/leave the page.
+        if (
+          shouldSuppressRepeatedBackPress(
+            lastHandledBackAtRef.current,
+            now,
+          )
+        ) {
+          return true;
+        }
+
+        lastHandledBackAtRef.current = now;
 
         switch (action) {
           case 'dismiss-overlay':
-            dismissOverlay();
+            current.dismissOverlay();
             return true;
           case 'webview-back':
-            goBack();
+            current.goBack();
             return true;
           case 'go-home':
-            goHome();
+            current.goHome();
             return true;
           case 'system-default':
             return false;
@@ -47,12 +74,5 @@ export const useBrowserBackHandler = ({
     );
 
     return () => subscription.remove();
-  }, [
-    overlayOpen,
-    canGoBack,
-    isAtHome,
-    dismissOverlay,
-    goBack,
-    goHome,
-  ]);
+  }, []);
 };
