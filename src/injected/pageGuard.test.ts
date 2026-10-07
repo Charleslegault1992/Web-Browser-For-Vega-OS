@@ -27,7 +27,7 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('anchorCreatesNewContext');
     expect(script).toContain('isUnwantedPrimaryPageEscape(href)');
     expect(script).toContain('isBlockedHost(href)');
-    expect(script).toContain('consumeNavigationEvent(event)');
+    expect(script).toContain('preventNavigationDefault(event)');
   });
 
   it('cancels scripted same-tab escapes when the Navigation API is available', () => {
@@ -35,6 +35,12 @@ describe('createPageGuardScript', () => {
     expect(script).toContain("addEventListener('navigate'");
     expect(script).toContain('event.destination.url');
     expect(script).toContain('event.preventDefault()');
+  });
+
+  it('keeps site click handlers alive while preventing default escape navigation', () => {
+    expect(script).toContain('event.preventDefault()');
+    expect(script).not.toContain('event.stopImmediatePropagation()');
+    expect(script).not.toContain('event.stopPropagation()');
   });
 
   it('blocks external forms from primary pages but leaves same-site forms native', () => {
