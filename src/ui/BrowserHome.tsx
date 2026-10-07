@@ -5,7 +5,7 @@ import {resolvePreferredDestinationIndex} from './homeFocusPolicy';
 import {
   KAYLANE_LOGO,
   KAYLANE_LOVE_LINES,
-  KAYLANE_MEMORIES,
+  KAYLANE_MEMORIES_COLLAGE,
 } from './kaylaneMemories';
 
 export type HomeDestination = {
@@ -74,26 +74,6 @@ const DestinationCard = ({
   );
 };
 
-type MemoryTileProps = {
-  memory: (typeof KAYLANE_MEMORIES)[number];
-  large?: boolean;
-};
-
-const MemoryTile = ({memory, large = false}: MemoryTileProps) => (
-  <View style={[styles.memoryTile, large && styles.memoryTileLarge]}>
-    <Image source={memory.source} resizeMode="cover" style={styles.memoryImage} />
-    <View style={styles.memoryScrim} />
-    <View style={styles.memoryCopy}>
-      <Text numberOfLines={1} style={styles.memoryTitle}>
-        {memory.title}
-      </Text>
-      <Text numberOfLines={2} style={styles.memoryCaption}>
-        {memory.caption}
-      </Text>
-    </View>
-  </View>
-);
-
 type Props = {
   onOpen: (url: string) => void;
   destinations?: readonly HomeDestination[];
@@ -110,9 +90,6 @@ export const BrowserHome = ({
     preferredUrl,
   );
 
-  const featured = KAYLANE_MEMORIES[0];
-  const memories = KAYLANE_MEMORIES.slice(1);
-
   return (
     <View style={styles.container}>
       <View style={styles.ambientGlowOne} />
@@ -123,7 +100,9 @@ export const BrowserHome = ({
 
         <View style={styles.brandCopy}>
           <Text style={styles.title}>Kaylane TV</Text>
-          <Text style={styles.subtitle}>Ta soirée, ton confort, notre petit coin à nous.</Text>
+          <Text style={styles.subtitle}>
+            Ta soirée, ton confort, notre petit coin à nous.
+          </Text>
         </View>
 
         <View style={styles.loveBadge}>
@@ -166,14 +145,37 @@ export const BrowserHome = ({
         </View>
 
         <View style={styles.rightColumn}>
-          <View style={styles.featuredWrap}>
-            <MemoryTile memory={featured} large />
+          <View style={styles.memoriesCard}>
+            <Image
+              source={KAYLANE_MEMORIES_COLLAGE}
+              resizeMode="cover"
+              style={styles.memoriesImage}
+            />
+            <View style={styles.memoriesScrim} />
+
+            <View style={styles.memoriesCopy}>
+              <Text style={styles.memoriesEyebrow}>NOS SOUVENIRS</Text>
+              <Text style={styles.memoriesTitle}>Nous deux ♥</Text>
+              <Text style={styles.memoriesCaption}>
+                Tous ces petits moments qui font ma vie plus belle avec toi.
+              </Text>
+            </View>
           </View>
 
-          <View style={styles.memoryGrid}>
-            {memories.map(memory => (
-              <MemoryTile key={memory.id} memory={memory} />
-            ))}
+          <View style={styles.rightMessageRow}>
+            <View style={styles.rightMessageCard}>
+              <Text style={styles.rightMessageHeart}>♥</Text>
+              <Text style={styles.rightMessageText}>
+                Peu importe la journée, je suis toujours fier de toi.
+              </Text>
+            </View>
+
+            <View style={styles.rightMessageCard}>
+              <Text style={styles.rightMessageHeart}>♥</Text>
+              <Text style={styles.rightMessageText}>
+                Mon choix préféré sera toujours toi.
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -272,6 +274,7 @@ const styles = StyleSheet.create({
   },
   rightColumn: {
     flex: 1,
+    gap: 12,
   },
   loveCard: {
     borderRadius: 24,
@@ -384,59 +387,77 @@ const styles = StyleSheet.create({
     lineHeight: 44,
     marginLeft: 12,
   },
-  featuredWrap: {
-    height: '53%',
-  },
-  memoryGrid: {
+  memoriesCard: {
     flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 10,
-  },
-  memoryTile: {
-    width: '49%',
-    height: '48%',
     overflow: 'hidden',
-    borderRadius: 18,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#26334d',
+    borderColor: '#293856',
     backgroundColor: '#0d1424',
   },
-  memoryTileLarge: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 24,
-  },
-  memoryImage: {
+  memoriesImage: {
     width: '100%',
     height: '100%',
   },
-  memoryScrim: {
+  memoriesScrim: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: '50%',
-    backgroundColor: 'rgba(3, 7, 18, 0.58)',
+    height: '48%',
+    backgroundColor: 'rgba(3, 7, 18, 0.63)',
   },
-  memoryCopy: {
+  memoriesCopy: {
     position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 13,
+    left: 24,
+    right: 24,
+    bottom: 20,
   },
-  memoryTitle: {
-    color: '#ffffff',
-    fontSize: 18,
-    lineHeight: 22,
-    fontWeight: '800',
-  },
-  memoryCaption: {
-    color: '#e3e9f3',
+  memoriesEyebrow: {
+    color: '#a8bfff',
     fontSize: 13,
-    lineHeight: 17,
-    marginTop: 3,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+  },
+  memoriesTitle: {
+    color: '#ffffff',
+    fontSize: 30,
+    lineHeight: 36,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  memoriesCaption: {
+    color: '#e7edf7',
+    fontSize: 16,
+    lineHeight: 22,
+    marginTop: 5,
+  },
+  rightMessageRow: {
+    height: 82,
+    flexDirection: 'row',
+    gap: 12,
+  },
+  rightMessageCard: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#26344f',
+    backgroundColor: '#10182a',
+    paddingHorizontal: 16,
+  },
+  rightMessageHeart: {
+    color: '#ff81bd',
+    fontSize: 19,
+    marginRight: 10,
+  },
+  rightMessageText: {
+    flex: 1,
+    color: '#dce6f6',
+    fontSize: 14,
+    lineHeight: 19,
+    fontWeight: '600',
   },
   footer: {
     alignSelf: 'center',
