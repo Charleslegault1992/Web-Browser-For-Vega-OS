@@ -17,6 +17,7 @@ import {
   shouldAllowWebViewNavigation,
 } from './navigation/policy';
 import {useBrowserBackHandler} from './remote/useBrowserBackHandler';
+import {useWebPointerMode} from './remote/useWebPointerMode';
 import {BrowserError} from './ui/BrowserError';
 import {BrowserHome} from './ui/BrowserHome';
 import {BrowserNotice} from './ui/BrowserNotice';
@@ -54,6 +55,15 @@ export const App = () => {
   const [webViewGeneration, setWebViewGeneration] = useState(0);
 
   const source = useMemo(() => ({uri: sourceUrl}), [sourceUrl]);
+
+  const injectWebPointerJavaScript = useCallback((script: string) => {
+    webViewRef.current?.injectJavaScript(script);
+  }, []);
+
+  const {syncMode: syncWebPointerMode} = useWebPointerMode({
+    active: surface === 'browser',
+    injectJavaScript: injectWebPointerJavaScript,
+  });
 
   const clearNoticeTimer = useCallback(() => {
     if (noticeTimeoutRef.current !== null) {
@@ -145,8 +155,9 @@ export const App = () => {
     (event: NavigationEvent) => {
       updateCanGoBack(event);
       setLoading(false);
+      syncWebPointerMode();
     },
-    [updateCanGoBack],
+    [syncWebPointerMode, updateCanGoBack],
   );
 
   const handlePageGuardMessage = useCallback(
@@ -177,7 +188,7 @@ export const App = () => {
         return;
       }
     },
-    [dismissNotice, showNotice],
+    [dismissNotice],
   );
 
   const handleNavigationRequest = useCallback(
