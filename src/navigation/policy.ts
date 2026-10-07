@@ -21,6 +21,7 @@ export type NavigationDecision =
       reason:
         | 'trusted-popup'
         | 'primary-host-popup'
+        | 'primary-opener-popup'
         | 'same-origin-popup';
       url: string;
     }
@@ -145,6 +146,18 @@ export const decideTopLevelNavigation = (
       return {
         action: 'same-window',
         reason: 'same-origin-popup',
+        url: normalizedUrl,
+      };
+    }
+
+    // Priority sites sometimes defer a legitimate player/navigation popup
+    // long enough that the browser no longer reports it as part of the
+    // original remote gesture. Keep that HTTPS flow in this same WebView,
+    // while the explicit nuisance-host check above still wins first.
+    if (opener && matchesAnyHostnameRule(opener.hostname, PRIMARY_HOSTS)) {
+      return {
+        action: 'same-window',
+        reason: 'primary-opener-popup',
         url: normalizedUrl,
       };
     }
