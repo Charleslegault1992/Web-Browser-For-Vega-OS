@@ -1,5 +1,5 @@
 export const normalizeHostname = (hostname: string): string =>
-  hostname.trim().toLowerCase().replace(/\.$/, '');
+  hostname.trim().toLowerCase().replace(/\.+$/, '');
 
 const normalizeRule = (rule: string): string =>
   normalizeHostname(rule.replace(/^\*\./, ''));

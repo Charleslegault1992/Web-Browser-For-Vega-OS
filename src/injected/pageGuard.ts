@@ -13,7 +13,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 1 }),
+    value: Object.freeze({ version: 2 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -24,7 +24,7 @@ export const createPageGuardScript = (): string => {
   var lastTrustedInteractionAt = 0;
 
   function normalizeHost(host) {
-    return String(host || '').trim().toLowerCase().replace(/\\.$/, '');
+    return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
   }
 
   function hostMatchesRule(host, rule) {
@@ -50,42 +50,88 @@ export const createPageGuardScript = (): string => {
     }
   }
 
+  function markTrustedInteraction(event) {
+    if (event && event.isTrusted === true) {
+      lastTrustedInteractionAt = Date.now();
+    }
+  }
+
   function isTrustedGesture() {
-    return Date.now() - lastTrustedInteractionAt <= TRUSTED_GESTURE_WINDOW_MS;
+    return Boolean(
+      lastTrustedInteractionAt > 0 &&
+      Date.now() - lastTrustedInteractionAt <= TRUSTED_GESTURE_WINDOW_MS
+    );
   }
 
   function postNavigationIntent(url, source, userInitiated) {
-    if (!url || !window.ReactNativeWebView || !window.ReactNativeWebView.postMessage) {
+    var value = url === undefined || url === null ? '' : String(url).trim();
+
+    if (
+      !value ||
+      !window.ReactNativeWebView ||
+      typeof window.ReactNativeWebView.postMessage !== 'function'
+    ) {
       return;
     }
 
     window.ReactNativeWebView.postMessage(JSON.stringify({
       type: 'kaylane:navigation-intent',
-      url: String(url),
+      url: value,
       openerUrl: window.location.href,
       source: source,
       userInitiated: Boolean(userInitiated)
     }));
   }
 
-  document.addEventListener('pointerdown', function () {
-    lastTrustedInteractionAt = Date.now();
-  }, true);
+  function targetCreatesNewContext(target) {
+    var normalized = String(target || '').trim().toLowerCase();
+    return Boolean(
+      normalized &&
+      normalized !== '_self' &&
+      normalized !== '_top' &&
+      normalized !== '_parent'
+    );
+  }
+
+  function neutralizeBaseTarget(base) {
+    if (
+      base &&
+      targetCreatesNewContext(base.getAttribute && base.getAttribute('target'))
+    ) {
+      base.setAttribute('target', '_self');
+    }
+  }
+
+  function neutralizeFormTarget(form, submitter) {
+    if (form && targetCreatesNewContext(form.getAttribute('target'))) {
+      form.setAttribute('target', '_self');
+    }
+
+    if (
+      submitter &&
+      submitter.getAttribute &&
+      targetCreatesNewContext(submitter.getAttribute('formtarget'))
+    ) {
+      submitter.setAttribute('formtarget', '_self');
+    }
+  }
+
+  document.addEventListener('pointerdown', markTrustedInteraction, true);
 
   document.addEventListener('keydown', function (event) {
     if (event.key === 'Enter' || event.key === ' ') {
-      lastTrustedInteractionAt = Date.now();
+      markTrustedInteraction(event);
     }
   }, true);
 
   window.open = function (url) {
-    if (url) {
-      postNavigationIntent(url, 'window.open', isTrustedGesture());
-    }
+    postNavigationIntent(url, 'window.open', isTrustedGesture());
     return null;
   };
 
   document.addEventListener('click', function (event) {
+    markTrustedInteraction(event);
+
     var target = event.target;
     if (!target || typeof target.closest !== 'function') {
       return;
@@ -97,69 +143,97 @@ export const createPageGuardScript = (): string => {
     }
 
     var opensNewContext =
-      anchor.getAttribute('target') === '_blank' ||
+      targetCreatesNewContext(anchor.getAttribute('target')) ||
       (anchor.relList && anchor.relList.contains('external'));
 
     if (!opensNewContext) {
       return;
     }
 
-    var href = anchor.href;
+    var href = anchor.getAttribute('href') || anchor.href;
     if (!href) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    postNavigationIntent(href, 'blank-target', true);
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
+    }
+
+    postNavigationIntent(href, 'blank-target', event.isTrusted === true);
   }, true);
+
+  document.addEventListener('submit', function (event) {
+    neutralizeFormTarget(event.target, event.submitter || null);
+  }, true);
+
+  if (
+    typeof HTMLFormElement !== 'undefined' &&
+    HTMLFormElement.prototype &&
+    typeof HTMLFormElement.prototype.submit === 'function'
+  ) {
+    var nativeFormSubmit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function () {
+      neutralizeFormTarget(this, null);
+      return nativeFormSubmit.apply(this, arguments);
+    };
+  }
+
+  function cleanIframe(frame) {
+    if (frame && frame.src && isBlockedHost(frame.src)) {
+      frame.remove();
+      return true;
+    }
+    return false;
+  }
 
   function cleanNode(node) {
     if (!node || node.nodeType !== 1) {
       return;
     }
 
-    if (
-      node.tagName === 'IFRAME' &&
-      node.src &&
-      isBlockedHost(node.src)
-    ) {
-      node.remove();
+    if (node.tagName === 'IFRAME' && cleanIframe(node)) {
       return;
     }
 
+    if (node.tagName === 'BASE') {
+      neutralizeBaseTarget(node);
+    }
+
     if (typeof node.querySelectorAll === 'function') {
-      node.querySelectorAll('iframe[src]').forEach(function (frame) {
-        if (frame.src && isBlockedHost(frame.src)) {
-          frame.remove();
-        }
-      });
+      node.querySelectorAll('iframe[src]').forEach(cleanIframe);
+      node.querySelectorAll('base[target]').forEach(neutralizeBaseTarget);
     }
   }
 
-  function cleanInitialBlockedFrames() {
-    document.querySelectorAll('iframe[src]').forEach(function (frame) {
-      if (frame.src && isBlockedHost(frame.src)) {
-        frame.remove();
-      }
-    });
+  function cleanInitialDocument() {
+    document.querySelectorAll('iframe[src]').forEach(cleanIframe);
+    document.querySelectorAll('base[target]').forEach(neutralizeBaseTarget);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', cleanInitialBlockedFrames, {
+    document.addEventListener('DOMContentLoaded', cleanInitialDocument, {
       once: true
     });
   } else {
-    cleanInitialBlockedFrames();
+    cleanInitialDocument();
   }
 
   var observer = new MutationObserver(function (mutations) {
     mutations.forEach(function (mutation) {
+      if (mutation.type === 'attributes') {
+        cleanNode(mutation.target);
+        return;
+      }
+
       mutation.addedNodes.forEach(cleanNode);
     });
   });
 
   observer.observe(document.documentElement || document, {
+    attributes: true,
+    attributeFilter: ['src', 'target'],
     childList: true,
     subtree: true
   });

@@ -8,18 +8,40 @@ export type PageGuardNavigationMessage = {
   userInitiated: boolean;
 };
 
+const MAX_MESSAGE_LENGTH = 8192;
+const MAX_URL_LENGTH = 4096;
+
 const isPopupSource = (
   value: unknown,
 ): value is PageGuardNavigationMessage['source'] =>
   value === 'window.open' || value === 'blank-target';
 
+const normalizeHttpsOpener = (value: string): string | null => {
+  const candidate = value.trim();
+
+  if (!candidate || candidate.length > MAX_URL_LENGTH) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(candidate);
+    return parsed.protocol === 'https:' ? parsed.href : null;
+  } catch {
+    return null;
+  }
+};
+
 export const parsePageGuardMessage = (
   rawMessage: string,
 ): PageGuardNavigationMessage | null => {
+  if (!rawMessage || rawMessage.length > MAX_MESSAGE_LENGTH) {
+    return null;
+  }
+
   try {
     const parsed: unknown = JSON.parse(rawMessage);
 
-    if (!parsed || typeof parsed !== 'object') {
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return null;
     }
 
@@ -35,10 +57,17 @@ export const parsePageGuardMessage = (
       return null;
     }
 
+    const url = candidate.url.trim();
+    const openerUrl = normalizeHttpsOpener(candidate.openerUrl);
+
+    if (!url || url.length > MAX_URL_LENGTH || !openerUrl) {
+      return null;
+    }
+
     return {
       type: 'kaylane:navigation-intent',
-      url: candidate.url,
-      openerUrl: candidate.openerUrl,
+      url,
+      openerUrl,
       source: candidate.source,
       userInitiated: candidate.userInitiated,
     };
