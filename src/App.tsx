@@ -1,18 +1,17 @@
-import React, {useCallback, useRef, useState} from 'react';
+import React, {useCallback, useRef} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {WebView} from '@amazon-devices/webview';
 
 import {APP_CONFIG} from './config';
-import type {BrowserNavigationState, WebViewHandle} from './types/webview';
+import type {BrowserNavigationState} from './types/webview';
 
 export const App = () => {
-  const webViewRef = useRef<WebViewHandle | null>(null);
-  const [navigationState, setNavigationState] =
-    useState<BrowserNavigationState>({
-      url: APP_CONFIG.homeUrl,
-      canGoBack: false,
-      canGoForward: false,
-    });
+  const webViewRef = useRef<React.ElementRef<typeof WebView> | null>(null);
+  const navigationStateRef = useRef<BrowserNavigationState>({
+    url: APP_CONFIG.homeUrl,
+    canGoBack: false,
+    canGoForward: false,
+  });
 
   const handleLoad = useCallback(
     (event: {
@@ -23,12 +22,13 @@ export const App = () => {
       };
     }) => {
       const {url, canGoBack, canGoForward} = event.nativeEvent;
+      const previous = navigationStateRef.current;
 
-      setNavigationState(previous => ({
+      navigationStateRef.current = {
         url: url ?? previous.url,
         canGoBack: Boolean(canGoBack),
         canGoForward: Boolean(canGoForward),
-      }));
+      };
     },
     [],
   );
