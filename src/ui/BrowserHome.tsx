@@ -1,11 +1,5 @@
-import React, {useMemo} from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type PressableStateCallbackType,
-} from 'react-native';
+import React, {useMemo, useState} from 'react';
+import {Pressable, StyleSheet, Text, View} from 'react-native';
 
 export type HomeDestination = {
   label: string;
@@ -26,6 +20,35 @@ const DEFAULT_DESTINATIONS: readonly HomeDestination[] = [
   },
 ];
 
+type DestinationCardProps = {
+  destination: HomeDestination;
+  preferredFocus: boolean;
+  onOpen: (url: string) => void;
+};
+
+const DestinationCard = ({
+  destination,
+  preferredFocus,
+  onOpen,
+}: DestinationCardProps) => {
+  const [focused, setFocused] = useState(false);
+
+  return (
+    <Pressable
+      hasTVPreferredFocus={preferredFocus}
+      enableSynchronousFocusEvents={true}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={() => onOpen(destination.url)}
+      accessibilityRole="button"
+      accessibilityLabel={destination.description}
+      style={[styles.card, focused && styles.cardFocused]}>
+      <Text style={styles.cardTitle}>{destination.label}</Text>
+      <Text style={styles.cardDescription}>{destination.description}</Text>
+    </Pressable>
+  );
+};
+
 type Props = {
   onOpen: (url: string) => void;
   destinations?: readonly HomeDestination[];
@@ -38,20 +61,12 @@ export const BrowserHome = ({
   const cards = useMemo(
     () =>
       destinations.map((destination, index) => (
-        <Pressable
+        <DestinationCard
           key={destination.url}
-          hasTVPreferredFocus={index === 0}
-          onPress={() => onOpen(destination.url)}
-          accessibilityRole="button"
-          accessibilityLabel={destination.description}
-          style={({focused, pressed}: PressableStateCallbackType) => [
-            styles.card,
-            focused && styles.cardFocused,
-            pressed && styles.cardPressed,
-          ]}>
-          <Text style={styles.cardTitle}>{destination.label}</Text>
-          <Text style={styles.cardDescription}>{destination.description}</Text>
-        </Pressable>
+          destination={destination}
+          preferredFocus={index === 0}
+          onOpen={onOpen}
+        />
       )),
     [destinations, onOpen],
   );
@@ -103,9 +118,6 @@ const styles = StyleSheet.create({
   cardFocused: {
     borderColor: '#ffffff',
     transform: [{scale: 1.05}],
-  },
-  cardPressed: {
-    transform: [{scale: 0.98}],
   },
   cardTitle: {
     color: '#ffffff',
