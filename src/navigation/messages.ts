@@ -3,6 +3,7 @@ import type {NavigationSource} from './policy';
 export type PageGuardNavigationMessage = {
   type: 'kaylane:navigation-intent';
   url: string;
+  openerUrl: string;
   source: Extract<NavigationSource, 'window.open' | 'blank-target'>;
   userInitiated: boolean;
 };
@@ -27,6 +28,7 @@ export const parsePageGuardMessage = (
     if (
       candidate.type !== 'kaylane:navigation-intent' ||
       typeof candidate.url !== 'string' ||
+      typeof candidate.openerUrl !== 'string' ||
       !isPopupSource(candidate.source) ||
       typeof candidate.userInitiated !== 'boolean'
     ) {
@@ -36,6 +38,7 @@ export const parsePageGuardMessage = (
     return {
       type: 'kaylane:navigation-intent',
       url: candidate.url,
+      openerUrl: candidate.openerUrl,
       source: candidate.source,
       userInitiated: candidate.userInitiated,
     };
