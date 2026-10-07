@@ -36,16 +36,11 @@ export const useBrowserBackHandler = (
           isAtHome: current.isAtHome,
         });
 
-        if (action === 'system-default') {
-          lastHandledBackAtRef.current = null;
-          return false;
-        }
-
         const now = Date.now();
 
-        // Fire TV key-repeat can deliver multiple Back events before React has
-        // committed the first state transition. Consume that tiny burst so one
-        // press cannot dismiss an overlay and also navigate/leave the page.
+        // Fire TV key-repeat can deliver multiple Back events before or just
+        // after React commits the first state transition. Consume that tiny
+        // burst so one press cannot dismiss an overlay, navigate, then exit.
         if (
           shouldSuppressRepeatedBackPress(
             lastHandledBackAtRef.current,
@@ -53,6 +48,11 @@ export const useBrowserBackHandler = (
           )
         ) {
           return true;
+        }
+
+        if (action === 'system-default') {
+          lastHandledBackAtRef.current = null;
+          return false;
         }
 
         lastHandledBackAtRef.current = now;

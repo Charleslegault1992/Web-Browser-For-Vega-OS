@@ -89,6 +89,10 @@ describe('shouldSuppressRepeatedBackPress', () => {
     ).toBe(false);
   });
 
+  it('suppresses browser-to-home key-repeat spillover before system Back', () => {
+    expect(shouldSuppressRepeatedBackPress(1_000, 1_100)).toBe(true);
+  });
+
   it('does not suppress when the clock moves backwards', () => {
     expect(shouldSuppressRepeatedBackPress(2_000, 1_000)).toBe(false);
   });

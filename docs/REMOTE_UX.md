@@ -68,10 +68,10 @@ The pure policy treats **home as authoritative** even if a stale
 `canGoBack=true` is observed during a rapid surface transition.
 
 The BackHandler listener is installed once per mounted shell and reads the
-latest controller state through a ref. A 180 ms no-timer debounce consumes only
-rapid repeated handled Back events. This prevents a key-repeat burst from
-closing a notice and also navigating away before React commits the first
-transition. System-default Back is never swallowed by the debounce.
+latest controller state through a ref. A 180 ms no-timer debounce consumes the
+immediate key-repeat burst from a just-handled app Back. This prevents one
+physical press from closing a notice, navigating, then exiting after the Home
+re-render. A clean Back press that starts on Home still falls through to Vega.
 
 ## Back integration contract
 
