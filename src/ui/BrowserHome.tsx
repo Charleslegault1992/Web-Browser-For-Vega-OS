@@ -4,7 +4,6 @@ import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {resolvePreferredDestinationIndex} from './homeFocusPolicy';
 import {
   KAYLANE_LOGO,
-  KAYLANE_LOVE_LINES,
   KAYLANE_MEMORIES_GRID,
 } from './kaylaneMemories';
 
@@ -54,29 +53,20 @@ const DestinationCard = ({
       onPress={() => onOpen(destination.url)}
       accessibilityRole="button"
       accessibilityLabel={`Ouvrir ${destination.label}`}
-      accessibilityHint="Appuie sur OK pour ouvrir"
       style={[
         styles.destinationCard,
         side === 'left' ? styles.movixCard : styles.dofuzCard,
-        focused && styles.destinationCardFocused,
+        focused && styles.focusedCard,
       ]}>
       <View style={styles.cardTopRow}>
-        <View
-          style={[
-            styles.destinationBadge,
-            side === 'left' ? styles.movixBadge : styles.dofuzBadge,
-          ]}>
-          <Text style={styles.destinationBadgeText}>
-            {side === 'left' ? 'GAUCHE' : 'DROITE'}
-          </Text>
-        </View>
+        <Text style={styles.destinationSide}>
+          {side === 'left' ? 'GAUCHE' : 'DROITE'}
+        </Text>
         <Text style={styles.okHint}>OK pour ouvrir</Text>
       </View>
 
       <Text style={styles.destinationTitle}>{destination.label}</Text>
-      <Text style={styles.destinationDescription}>
-        {destination.description}
-      </Text>
+      <Text style={styles.destinationDescription}>{destination.description}</Text>
 
       <View style={styles.openRow}>
         <Text style={styles.openText}>Ouvrir {destination.label}</Text>
@@ -101,12 +91,11 @@ export const BrowserHome = ({
     destinations,
     preferredUrl,
   );
+  const [memoriesOpen, setMemoriesOpen] = useState(false);
+  const [memoriesFocused, setMemoriesFocused] = useState(false);
 
   return (
     <View style={styles.container}>
-      <View style={styles.glowBlue} />
-      <View style={styles.glowPink} />
-
       <View style={styles.header}>
         <View style={styles.brand}>
           <Image source={KAYLANE_LOGO} resizeMode="cover" style={styles.logo} />
@@ -135,43 +124,67 @@ export const BrowserHome = ({
       </View>
 
       <View style={styles.bottomRow}>
-        <View style={styles.photoPanel}>
+        <Pressable
+          enableSynchronousFocusEvents={true}
+          onFocus={() => setMemoriesFocused(true)}
+          onBlur={() => setMemoriesFocused(false)}
+          onPress={() => setMemoriesOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir nos souvenirs"
+          style={[
+            styles.memoriesCard,
+            memoriesFocused && styles.memoriesCardFocused,
+          ]}>
           <Image
             source={KAYLANE_MEMORIES_GRID}
             resizeMode="cover"
-            style={styles.photoGrid}
+            style={styles.memoriesImage}
           />
-          <View style={styles.photoLabel}>
-            <Text style={styles.photoLabelTitle}>Nos souvenirs ♥</Text>
-            <Text style={styles.photoLabelText}>
-              Des petits bouts de nous dans Kaylane TV.
-            </Text>
+          <View style={styles.memoriesLabel}>
+            <View>
+              <Text style={styles.memoriesTitle}>Nos souvenirs ♥</Text>
+              <Text style={styles.memoriesText}>OK pour voir les photos</Text>
+            </View>
+            <Text style={styles.memoriesArrow}>›</Text>
           </View>
-        </View>
+        </Pressable>
 
-        <View style={styles.loveColumn}>
-          <View style={styles.mainLoveCard}>
-            <Text style={styles.mainLoveText}>
-              Je t’aime. Je suis fier de toi.
-            </Text>
-            <Text style={styles.mainLoveSubtext}>
-              Tu es l’amour de ma vie.
-            </Text>
-            <Text style={styles.signature}>— Charles ♥</Text>
+        <View style={styles.lovePanel}>
+          <View style={styles.loveCardPrimary}>
+            <Text style={styles.lovePrimary}>Je t’aime.</Text>
+            <Text style={styles.loveSecondary}>Tu es l’amour de ma vie.</Text>
           </View>
 
-          <View style={styles.smallLoveRow}>
-            {KAYLANE_LOVE_LINES.slice(0, 2).map(line => (
-              <View key={line} style={styles.smallLoveCard}>
-                <Text style={styles.smallHeart}>♥</Text>
-                <Text style={styles.smallLoveText}>{line}</Text>
-              </View>
-            ))}
+          <View style={styles.loveCardSmall}>
+            <Text style={styles.smallHeart}>♥</Text>
+            <Text style={styles.loveSmall}>Je suis fier de toi.</Text>
           </View>
+
+          <Text style={styles.signature}>— Charles ♥</Text>
         </View>
       </View>
 
       <Text style={styles.footer}>Kaylane TV · Fait avec amour</Text>
+
+      {memoriesOpen ? (
+        <Pressable
+          hasTVPreferredFocus={true}
+          enableSynchronousFocusEvents={true}
+          onPress={() => setMemoriesOpen(false)}
+          accessibilityRole="button"
+          accessibilityLabel="Fermer nos souvenirs"
+          style={styles.memoriesOverlay}>
+          <Image
+            source={KAYLANE_MEMORIES_GRID}
+            resizeMode="contain"
+            style={styles.memoriesOverlayImage}
+          />
+          <View style={styles.memoriesOverlayHeader}>
+            <Text style={styles.memoriesOverlayTitle}>Nos souvenirs ♥</Text>
+            <Text style={styles.memoriesOverlayHint}>OK pour fermer</Text>
+          </View>
+        </Pressable>
+      ) : null}
     </View>
   );
 };
@@ -181,35 +194,15 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     backgroundColor: '#050713',
-    paddingHorizontal: 40,
-    paddingTop: 26,
-    paddingBottom: 16,
-  },
-  glowBlue: {
-    position: 'absolute',
-    width: 580,
-    height: 580,
-    borderRadius: 290,
-    backgroundColor: '#173d87',
-    opacity: 0.18,
-    top: -330,
-    left: -120,
-  },
-  glowPink: {
-    position: 'absolute',
-    width: 520,
-    height: 520,
-    borderRadius: 260,
-    backgroundColor: '#6b1d67',
-    opacity: 0.12,
-    bottom: -320,
-    right: -120,
+    paddingHorizontal: 36,
+    paddingTop: 22,
+    paddingBottom: 14,
   },
   header: {
-    minHeight: 82,
+    height: 76,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 18,
+    marginBottom: 14,
   },
   brand: {
     flex: 1,
@@ -217,24 +210,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logo: {
-    width: 72,
-    height: 72,
-    borderRadius: 17,
-    marginRight: 16,
+    width: 66,
+    height: 66,
+    borderRadius: 16,
+    marginRight: 15,
     borderWidth: 1,
     borderColor: '#4869bb',
   },
   title: {
     color: '#ffffff',
-    fontSize: 37,
-    lineHeight: 42,
+    fontSize: 34,
+    lineHeight: 39,
     fontWeight: '900',
   },
   subtitle: {
     color: '#b9c5da',
-    fontSize: 17,
-    lineHeight: 22,
-    marginTop: 2,
+    fontSize: 16,
+    lineHeight: 21,
+    marginTop: 1,
   },
   forKaylane: {
     flexDirection: 'row',
@@ -243,61 +236,50 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#634b8e',
     backgroundColor: '#17162a',
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
   },
   heart: {
     color: '#ff83bd',
-    fontSize: 19,
-    marginRight: 8,
+    fontSize: 18,
+    marginRight: 7,
   },
   forKaylaneText: {
     color: '#f5eafa',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
   },
   destinationRow: {
-    height: 230,
+    height: 188,
     flexDirection: 'row',
-    gap: 22,
-    marginBottom: 18,
+    gap: 18,
+    marginBottom: 16,
   },
   destinationCard: {
     flex: 1,
-    borderRadius: 26,
+    borderRadius: 23,
     borderWidth: 4,
-    paddingHorizontal: 26,
-    paddingVertical: 21,
+    paddingHorizontal: 23,
+    paddingVertical: 18,
     justifyContent: 'space-between',
   },
   movixCard: {
-    backgroundColor: '#111c34',
+    backgroundColor: '#101b33',
     borderColor: '#35599c',
   },
   dofuzCard: {
-    backgroundColor: '#1a1531',
-    borderColor: '#6b4195',
+    backgroundColor: '#19142f',
+    borderColor: '#71449b',
   },
-  destinationCardFocused: {
+  focusedCard: {
     borderColor: '#ffffff',
-    transform: [{scale: 1.018}],
+    transform: [{scale: 1.015}],
   },
   cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  destinationBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  movixBadge: {
-    backgroundColor: '#315baa',
-  },
-  dofuzBadge: {
-    backgroundColor: '#834db4',
-  },
-  destinationBadgeText: {
+  destinationSide: {
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '900',
@@ -305,20 +287,20 @@ const styles = StyleSheet.create({
   },
   okHint: {
     marginLeft: 'auto',
-    color: '#aebdd4',
+    color: '#b8c5da',
     fontSize: 14,
     fontWeight: '700',
   },
   destinationTitle: {
     color: '#ffffff',
-    fontSize: 43,
-    lineHeight: 48,
+    fontSize: 39,
+    lineHeight: 44,
     fontWeight: '900',
   },
   destinationDescription: {
-    color: '#c7d2e4',
-    fontSize: 18,
-    lineHeight: 23,
+    color: '#cad4e4',
+    fontSize: 17,
+    lineHeight: 22,
   },
   openRow: {
     flexDirection: 'row',
@@ -326,121 +308,161 @@ const styles = StyleSheet.create({
   },
   openText: {
     color: '#ffffff',
-    fontSize: 18,
-    lineHeight: 23,
+    fontSize: 17,
+    lineHeight: 22,
     fontWeight: '800',
   },
   openArrow: {
     color: '#ffffff',
-    fontSize: 35,
-    lineHeight: 35,
-    marginLeft: 8,
+    fontSize: 30,
+    lineHeight: 30,
+    marginLeft: 7,
   },
   bottomRow: {
     flex: 1,
     minHeight: 0,
     flexDirection: 'row',
-    gap: 20,
+    gap: 18,
   },
-  photoPanel: {
-    flex: 1.3,
+  memoriesCard: {
+    flex: 1.35,
     overflow: 'hidden',
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: '#283753',
+    borderRadius: 21,
+    borderWidth: 3,
+    borderColor: '#293854',
     backgroundColor: '#0d1424',
   },
-  photoGrid: {
+  memoriesCardFocused: {
+    borderColor: '#ffffff',
+  },
+  memoriesImage: {
     width: '100%',
     height: '100%',
   },
-  photoLabel: {
+  memoriesLabel: {
     position: 'absolute',
-    left: 18,
-    right: 18,
-    bottom: 16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(5, 9, 21, 0.82)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    left: 14,
+    right: 14,
+    bottom: 13,
+    minHeight: 62,
+    borderRadius: 15,
+    backgroundColor: 'rgba(5, 9, 21, 0.88)',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  photoLabelTitle: {
+  memoriesTitle: {
     color: '#ffffff',
-    fontSize: 20,
-    lineHeight: 24,
+    fontSize: 19,
+    lineHeight: 23,
     fontWeight: '900',
   },
-  photoLabelText: {
-    color: '#d7dfed',
-    fontSize: 14,
-    lineHeight: 18,
+  memoriesText: {
+    color: '#cdd7e7',
+    fontSize: 13,
+    lineHeight: 17,
     marginTop: 2,
   },
-  loveColumn: {
-    flex: 0.9,
+  memoriesArrow: {
+    color: '#ffffff',
+    fontSize: 32,
+    marginLeft: 'auto',
+  },
+  lovePanel: {
+    flex: 0.85,
+    justifyContent: 'center',
     gap: 12,
   },
-  mainLoveCard: {
-    flex: 1,
-    justifyContent: 'center',
-    borderRadius: 22,
+  loveCardPrimary: {
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: '#2c3957',
     backgroundColor: '#10182a',
-    paddingHorizontal: 22,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
   },
-  mainLoveText: {
+  lovePrimary: {
     color: '#ffffff',
-    fontSize: 27,
-    lineHeight: 34,
+    fontSize: 26,
+    lineHeight: 31,
     fontWeight: '900',
   },
-  mainLoveSubtext: {
+  loveSecondary: {
     color: '#ffb4d5',
-    fontSize: 22,
-    lineHeight: 29,
+    fontSize: 20,
+    lineHeight: 25,
     fontWeight: '800',
-    marginTop: 6,
+    marginTop: 5,
   },
-  signature: {
-    color: '#95a8c7',
-    fontSize: 15,
-    lineHeight: 20,
-    fontWeight: '700',
-    marginTop: 13,
-  },
-  smallLoveRow: {
-    height: 86,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  smallLoveCard: {
-    flex: 1,
+  loveCardSmall: {
+    minHeight: 66,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#293858',
     backgroundColor: '#151e34',
-    paddingHorizontal: 14,
+    paddingHorizontal: 17,
   },
   smallHeart: {
     color: '#ff83bd',
     fontSize: 18,
-    marginRight: 8,
+    marginRight: 9,
   },
-  smallLoveText: {
-    flex: 1,
+  loveSmall: {
     color: '#edf2fa',
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '800',
+  },
+  signature: {
+    color: '#95a8c7',
     fontSize: 14,
     lineHeight: 18,
     fontWeight: '700',
+    marginLeft: 4,
   },
   footer: {
     alignSelf: 'center',
     color: '#707f97',
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 9,
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 8,
+  },
+  memoriesOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 100,
+    backgroundColor: '#040711',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 34,
+  },
+  memoriesOverlayImage: {
+    width: '100%',
+    height: '100%',
+  },
+  memoriesOverlayHeader: {
+    position: 'absolute',
+    left: 44,
+    right: 44,
+    top: 34,
+    height: 58,
+    borderRadius: 16,
+    backgroundColor: 'rgba(5,9,21,0.88)',
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  memoriesOverlayTitle: {
+    color: '#ffffff',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  memoriesOverlayHint: {
+    marginLeft: 'auto',
+    color: '#d9e1ef',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
