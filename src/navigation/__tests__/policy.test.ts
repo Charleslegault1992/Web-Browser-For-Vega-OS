@@ -8,7 +8,26 @@ describe('decideTopLevelNavigation', () => {
         source: 'page',
         userInitiated: false,
       }),
-    ).toEqual({action: 'allow', reason: 'https-navigation'});
+    ).toEqual({
+      action: 'allow',
+      reason: 'https-navigation',
+      url: 'https://example.com/video',
+    });
+  });
+
+  it('resolves relative popup URLs against the opener', () => {
+    expect(
+      decideTopLevelNavigation({
+        url: '/watch/123',
+        openerUrl: 'https://movix.luxe/home',
+        source: 'window.open',
+        userInitiated: true,
+      }),
+    ).toEqual({
+      action: 'same-window',
+      reason: 'trusted-popup',
+      url: 'https://movix.luxe/watch/123',
+    });
   });
 
   it('blocks cleartext HTTP', () => {
@@ -38,7 +57,11 @@ describe('decideTopLevelNavigation', () => {
         source: 'window.open',
         userInitiated: true,
       }),
-    ).toEqual({action: 'same-window', reason: 'trusted-popup'});
+    ).toEqual({
+      action: 'same-window',
+      reason: 'trusted-popup',
+      url: 'https://player.example/video',
+    });
   });
 
   it('blocks an untrusted third-party popup', () => {
@@ -58,6 +81,10 @@ describe('decideTopLevelNavigation', () => {
         source: 'window.open',
         userInitiated: false,
       }),
-    ).toEqual({action: 'same-window', reason: 'primary-host-popup'});
+    ).toEqual({
+      action: 'same-window',
+      reason: 'primary-host-popup',
+      url: 'https://www.dofuz.com/watch',
+    });
   });
 });
