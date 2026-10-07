@@ -281,3 +281,18 @@ Repeat Home -> Movix/Dofuz -> playback -> Back -> Home for at least 20 cycles:
 - no increasing React render activity during playback;
 - no second WebView/window;
 - no crash or obvious memory-growth regression.
+
+
+## Playback/load resilience after physical testing
+
+Generic WebView `onError` events are not treated as an immediate fatal replacement screen anymore. The callback does not expose `isMainFrame`, so replacing the entire browser surface on every load error can incorrectly turn a dependent/player failure into a full-page "connection lost" experience.
+
+Kaylane TV now:
+- ignores dependent/player errors when the failing URL is different from the tracked main-frame URL;
+- performs at most two bounded soft reload attempts for a matching top-level load error;
+- retries transient main-frame HTTP responses such as 408, 429, 5xx gateway/service errors, and common 52x edge failures;
+- leaves the existing page visible after the bounded retries instead of forcing a fatal connection overlay;
+- still cancels SSL errors;
+- still uses a fatal recovery screen for non-transient main-frame HTTP failures.
+
+This is intentionally bounded: there is no infinite reload loop and no permanent retry timer.
