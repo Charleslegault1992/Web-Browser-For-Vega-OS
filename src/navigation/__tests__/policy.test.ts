@@ -178,9 +178,24 @@ describe('decideTopLevelNavigation', () => {
     ).toEqual({action: 'block', reason: 'blocked-ad-host'});
   });
 
-  it('blocks an untrusted third-party popup', () => {
+  it('keeps a delayed third-party popup from a priority opener in the same window', () => {
     expect(
       decideTopLevelNavigation(popup({userInitiated: false})),
+    ).toEqual({
+      action: 'same-window',
+      reason: 'primary-opener-popup',
+      url: 'https://player.example/video',
+    });
+  });
+
+  it('still blocks an untrusted third-party popup from an unrelated opener', () => {
+    expect(
+      decideTopLevelNavigation(
+        popup({
+          openerUrl: 'https://unrelated.example/watch',
+          userInitiated: false,
+        }),
+      ),
     ).toEqual({action: 'block', reason: 'untrusted-popup'});
   });
 
@@ -222,14 +237,19 @@ describe('decideTopLevelNavigation', () => {
         userInitiated: false,
       }),
     );
-    expect(decision).toEqual({action: 'block', reason: 'untrusted-popup'});
+    expect(decision).toEqual({
+      action: 'same-window',
+      reason: 'primary-opener-popup',
+      url: 'https://xn--dfuz-55d.com/watch',
+    });
   });
 
-  it('does not treat the punycode form of a unicode lookalike as a primary host', () => {
+  it('does not treat the punycode form of a unicode lookalike as a primary destination', () => {
     expect(
       decideTopLevelNavigation(
         popup({
           url: 'https://xn--dfuz-55d.com/watch',
+          openerUrl: 'https://unrelated.example/',
           userInitiated: false,
         }),
       ),
@@ -241,6 +261,7 @@ describe('decideTopLevelNavigation', () => {
       decideTopLevelNavigation(
         popup({
           url: 'https://movix.luxe@evil.example/watch',
+          openerUrl: 'https://unrelated.example/',
           userInitiated: false,
         }),
       ),
