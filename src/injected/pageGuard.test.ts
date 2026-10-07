@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 2');
+    expect(script).toContain('version: 3');
   });
 
   it('neutralizes and locks window.open without creating another context', () => {
@@ -13,7 +13,7 @@ describe('createPageGuardScript', () => {
     expect(script).toContain("Object.defineProperty(window, 'open'");
     expect(script).toContain("Object.defineProperty(Window.prototype, 'open'");
     expect(script).toContain("postNavigationIntent(url, 'window.open'");
-    expect(script).toContain('return null;');
+    expect(script).toContain('return window;');
   });
 
   it('handles dynamic new-context links and form targets', () => {
@@ -27,6 +27,7 @@ describe('createPageGuardScript', () => {
   it('uses trusted browser events for remote/pointer activation hints', () => {
     expect(script).toContain('event.isTrusted === true');
     expect(script).toContain("event.key === 'Enter' || event.key === ' '");
+    expect(script).toContain('event.isTrusted === true || isTrustedGesture()');
   });
 
   it('observes only bounded DOM changes and iframe/base attributes', () => {
