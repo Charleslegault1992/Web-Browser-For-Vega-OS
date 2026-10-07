@@ -43,7 +43,7 @@ export const App = () => {
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [surface, setSurface] = useState<AppSurface>('home');
-  const [sourceUrl, setSourceUrl] = useState(APP_CONFIG.homeUrl);
+  const [sourceUrl, setSourceUrl] = useState<string>(APP_CONFIG.homeUrl);
   const [preferredHomeUrl, setPreferredHomeUrl] = useState<string | undefined>();
   const [canGoBack, setCanGoBack] = useState(false);
   const [loading, setLoading] = useState(false);
