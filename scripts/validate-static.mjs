@@ -30,6 +30,9 @@ expect(pkg.dependencies?.['@amazon-devices/react-native-kepler'] === '~4.0.0+rn0
 expect(pkg.dependencies?.['@amazon-devices/webview'] === '~4.0.2', 'Vega WebView must stay on 4.0.2-compatible releases.');
 expect(pkg.devDependencies?.['@amazon-devices/kepler-cli-platform'] === '~0.22.0', 'kepler-cli-platform must stay on the current Vega SDK line.');
 expect(pkg.devDependencies?.['@amazon-devices/keplerscript-commonmodules'] === '~1.0.0', 'RN 0.83 common modules bundle dependency is required.');
+expect(pkg.devDependencies?.['@babel/core'] === '^7.25.2', 'RN 0.83 Babel core dependency drifted.');
+expect(pkg.devDependencies?.['@babel/preset-env'] === '^7.25.3', 'RN 0.83 Babel preset dependency drifted.');
+expect(pkg.devDependencies?.['@babel/runtime'] === '^7.25.0', 'RN 0.83 Babel runtime dependency drifted.');
 expect(pkg.devDependencies?.['@react-native-community/cli'] === '^20.0.0', 'React Native community CLI must remain installed for Vega build command registration.');
 expect(pkg.scripts?.build === 'react-native build-vega', 'Default build must use react-native build-vega.');
 expect(pkg.scripts?.['build:debug'] === 'react-native build-vega --build-type Debug', 'Debug build script drifted.');
