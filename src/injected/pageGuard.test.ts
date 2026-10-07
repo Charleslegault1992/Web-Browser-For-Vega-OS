@@ -12,7 +12,7 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('var guardedWindowOpen = function (url)');
     expect(script).toContain("Object.defineProperty(window, 'open'");
     expect(script).toContain("Object.defineProperty(Window.prototype, 'open'");
-    expect(script).toContain("postNavigationIntent(url, 'window.open'");
+    expect(script).toContain("postNavigationIntent(value, 'window.open'");
     expect(script).toContain('return window;');
   });
 
