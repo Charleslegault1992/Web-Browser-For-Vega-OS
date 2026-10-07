@@ -15,8 +15,12 @@ export type NavigationIntent = {
 };
 
 export type NavigationDecision =
-  | {action: 'allow'; reason: 'https-navigation'}
-  | {action: 'same-window'; reason: 'trusted-popup' | 'primary-host-popup'}
+  | {action: 'allow'; reason: 'https-navigation'; url: string}
+  | {
+      action: 'same-window';
+      reason: 'trusted-popup' | 'primary-host-popup';
+      url: string;
+    }
   | {
       action: 'block';
       reason:
@@ -27,9 +31,9 @@ export type NavigationDecision =
         | 'untrusted-popup';
     };
 
-const parseUrl = (rawUrl: string): URL | null => {
+const parseUrl = (rawUrl: string, baseUrl?: string): URL | null => {
   try {
-    return new URL(rawUrl);
+    return baseUrl ? new URL(rawUrl, baseUrl) : new URL(rawUrl);
   } catch {
     return null;
   }
@@ -38,7 +42,7 @@ const parseUrl = (rawUrl: string): URL | null => {
 export const decideTopLevelNavigation = (
   intent: NavigationIntent,
 ): NavigationDecision => {
-  const destination = parseUrl(intent.url);
+  const destination = parseUrl(intent.url, intent.openerUrl);
 
   if (!destination) {
     return {action: 'block', reason: 'invalid-url'};
@@ -61,17 +65,27 @@ export const decideTopLevelNavigation = (
     return {action: 'block', reason: 'blocked-ad-host'};
   }
 
+  const normalizedUrl = destination.href;
+
   if (intent.source === 'window.open' || intent.source === 'blank-target') {
     if (intent.userInitiated) {
-      return {action: 'same-window', reason: 'trusted-popup'};
+      return {
+        action: 'same-window',
+        reason: 'trusted-popup',
+        url: normalizedUrl,
+      };
     }
 
     if (matchesAnyHostnameRule(destination.hostname, PRIMARY_HOSTS)) {
-      return {action: 'same-window', reason: 'primary-host-popup'};
+      return {
+        action: 'same-window',
+        reason: 'primary-host-popup',
+        url: normalizedUrl,
+      };
     }
 
     return {action: 'block', reason: 'untrusted-popup'};
   }
 
-  return {action: 'allow', reason: 'https-navigation'};
+  return {action: 'allow', reason: 'https-navigation', url: normalizedUrl};
 };
