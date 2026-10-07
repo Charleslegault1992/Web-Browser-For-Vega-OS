@@ -173,23 +173,16 @@ export const App = () => {
       }
 
       if (decision.action === 'block') {
-        showNotice('Fenêtre ou navigation indésirable bloquée');
+        // Popup/new-window attempts are intentionally ignored silently.
+        return;
       }
     },
     [dismissNotice, showNotice],
   );
 
   const handleNavigationRequest = useCallback(
-    (request: {url: string}) => {
-      const allowed = shouldAllowWebViewNavigation(request.url);
-
-      if (!allowed) {
-        showNotice('Navigation indésirable bloquée');
-      }
-
-      return allowed;
-    },
-    [showNotice],
+    (request: {url: string}) => shouldAllowWebViewNavigation(request.url),
+    [],
   );
 
   const handleMainFrameFailure = useCallback((message: string) => {
