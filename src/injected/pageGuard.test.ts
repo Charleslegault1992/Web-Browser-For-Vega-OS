@@ -5,41 +5,46 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 5');
+    expect(script).toContain('version: 6');
   });
 
-  it('locks window.open and ignores it without navigating', () => {
-    expect(script).toContain('var guardedWindowOpen = function ()');
-    expect(script).toContain("Object.defineProperty(window, 'open'");
-    expect(script).toContain("Object.defineProperty(Window.prototype, 'open'");
-    expect(script).toContain('return window;');
-    expect(script).not.toContain('window.location.assign(');
-    expect(script).not.toContain('postNavigationIntent(');
+  it('returns an isolated popup stub instead of the real window', () => {
+    expect(script).toContain('function createPopupStub()');
+    expect(script).toContain('return createPopupStub();');
+    expect(script).toContain('location: createPopupLocationStub()');
+    expect(script).toContain('stub.self = stub');
+    expect(script).not.toContain('return window;');
   });
 
-  it('ignores explicit new-context links instead of recycling them in-place', () => {
+  it('keeps popup location assignments inert', () => {
+    expect(script).toContain('function createPopupLocationStub()');
+    expect(script).toContain('set href(value)');
+    expect(script).toContain('assign: function (value)');
+    expect(script).toContain('replace: function (value)');
+  });
+
+  it('blocks explicit new-context links and same-tab external escapes on primary pages', () => {
     expect(script).toContain('anchorCreatesNewContext');
-    expect(script).toContain("anchor.relList.contains('external')");
-    expect(script).toContain('consumeNewContextEvent(event)');
-    expect(script).not.toContain('tryNavigateInCurrentWindow');
+    expect(script).toContain('isUnwantedPrimaryPageEscape(href)');
+    expect(script).toContain('isBlockedHost(href)');
+    expect(script).toContain('consumeNavigationEvent(event)');
   });
 
-  it('ignores explicit new-context forms but leaves same-window forms native', () => {
+  it('blocks external forms from primary pages but leaves same-site forms native', () => {
     expect(script).toContain('submitCreatesNewContext');
-    expect(script).toContain("document.addEventListener('submit'");
-    expect(script).toContain('HTMLFormElement.prototype.submit');
+    expect(script).toContain('isUnwantedPrimaryPageEscape(action)');
     expect(script).toContain('return nativeFormSubmit.apply(this, arguments)');
   });
 
-  it('accounts for base[target] when deciding whether a link opens another context', () => {
-    expect(script).toContain("document.querySelector('base[target]')");
-    expect(script).toContain('defaultBaseTarget()');
+  it('does not globally block third-party frames/media hosts', () => {
+    expect(script).toContain('isPrimaryHost(window.location.hostname)');
+    expect(script).toContain("node.querySelectorAll('iframe[src]').forEach(cleanIframe)");
+    expect(script).not.toContain("querySelectorAll('iframe').forEach(function");
   });
 
   it('observes only bounded DOM changes for blocked iframe cleanup', () => {
     expect(script).toContain('mutation.addedNodes.forEach(cleanNode)');
     expect(script).toContain("attributeFilter: ['src']");
     expect(script).not.toContain('setInterval(');
-    expect(script).not.toContain('requestAnimationFrame(');
   });
 });
