@@ -1,11 +1,7 @@
-import {BLOCKED_AD_NAVIGATION_HOSTS, PRIMARY_HOSTS} from '../navigation/rules';
-
-const TRUSTED_GESTURE_WINDOW_MS = 1200;
+import {BLOCKED_AD_NAVIGATION_HOSTS} from '../navigation/rules';
 
 export const createPageGuardScript = (): string => {
   const blockedHosts = JSON.stringify(BLOCKED_AD_NAVIGATION_HOSTS);
-  const primaryHosts = JSON.stringify(PRIMARY_HOSTS);
-  const gestureWindow = String(TRUSTED_GESTURE_WINDOW_MS);
 
   return `
 (function () {
@@ -14,16 +10,13 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 4 }),
+    value: Object.freeze({ version: 5 }),
     configurable: false,
     enumerable: false,
     writable: false
   });
 
   var BLOCKED_HOSTS = ${blockedHosts};
-  var PRIMARY_HOSTS = ${primaryHosts};
-  var TRUSTED_GESTURE_WINDOW_MS = ${gestureWindow};
-  var lastTrustedInteractionAt = 0;
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -61,66 +54,6 @@ export const createPageGuardScript = (): string => {
     });
   }
 
-  function isPrimaryHostname(hostname) {
-    return PRIMARY_HOSTS.some(function (rule) {
-      return hostMatchesRule(hostname, rule);
-    });
-  }
-
-  function tryNavigateInCurrentWindow(url) {
-    var destination = parseHttpsDestination(url);
-    var current = parseHttpsDestination(window.location.href);
-
-    if (!destination || !current || isBlockedHost(destination.href)) {
-      return false;
-    }
-
-    var sameOrigin = destination.origin === current.origin;
-    var primaryToPrimary =
-      isPrimaryHostname(current.hostname) &&
-      isPrimaryHostname(destination.hostname);
-
-    if (!sameOrigin && !primaryToPrimary) {
-      return false;
-    }
-
-    window.location.assign(destination.href);
-    return true;
-  }
-
-  function markTrustedInteraction(event) {
-    if (event && event.isTrusted === true) {
-      lastTrustedInteractionAt = Date.now();
-    }
-  }
-
-  function isTrustedGesture() {
-    return Boolean(
-      lastTrustedInteractionAt > 0 &&
-      Date.now() - lastTrustedInteractionAt <= TRUSTED_GESTURE_WINDOW_MS
-    );
-  }
-
-  function postNavigationIntent(url, source, userInitiated) {
-    var value = url === undefined || url === null ? '' : String(url).trim();
-
-    if (
-      !value ||
-      !window.ReactNativeWebView ||
-      typeof window.ReactNativeWebView.postMessage !== 'function'
-    ) {
-      return;
-    }
-
-    window.ReactNativeWebView.postMessage(JSON.stringify({
-      type: 'kaylane:navigation-intent',
-      url: value,
-      openerUrl: window.location.href,
-      source: source,
-      userInitiated: Boolean(userInitiated)
-    }));
-  }
-
   function targetCreatesNewContext(target) {
     var normalized = String(target || '').trim().toLowerCase();
     return Boolean(
@@ -131,59 +64,50 @@ export const createPageGuardScript = (): string => {
     );
   }
 
-  function neutralizeBaseTarget(base) {
-    if (
-      base &&
-      targetCreatesNewContext(base.getAttribute && base.getAttribute('target'))
-    ) {
-      base.setAttribute('target', '_self');
+  function defaultBaseTarget() {
+    var base = document.querySelector('base[target]');
+    return base && base.getAttribute ? base.getAttribute('target') : '';
+  }
+
+  function anchorCreatesNewContext(anchor) {
+    var target =
+      (anchor && anchor.getAttribute && anchor.getAttribute('target')) ||
+      defaultBaseTarget();
+
+    return Boolean(
+      targetCreatesNewContext(target) ||
+      (anchor && anchor.relList && anchor.relList.contains('external'))
+    );
+  }
+
+  function submitCreatesNewContext(form, submitter) {
+    var submitterTarget =
+      submitter && submitter.getAttribute
+        ? submitter.getAttribute('formtarget')
+        : '';
+
+    var formTarget =
+      form && form.getAttribute ? form.getAttribute('target') : '';
+
+    return targetCreatesNewContext(
+      submitterTarget || formTarget || defaultBaseTarget()
+    );
+  }
+
+  function consumeNewContextEvent(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (typeof event.stopImmediatePropagation === 'function') {
+      event.stopImmediatePropagation();
     }
   }
 
-  function neutralizeSubmitterTarget(submitter) {
-    if (
-      submitter &&
-      submitter.getAttribute &&
-      targetCreatesNewContext(submitter.getAttribute('formtarget'))
-    ) {
-      submitter.setAttribute('formtarget', '_self');
-    }
-  }
-
-  function neutralizeFormTarget(form, submitter) {
-    if (form && targetCreatesNewContext(form.getAttribute('target'))) {
-      form.setAttribute('target', '_self');
-    }
-
-    neutralizeSubmitterTarget(submitter);
-  }
-
-  document.addEventListener('pointerdown', markTrustedInteraction, true);
-
-  document.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      markTrustedInteraction(event);
-    }
-  }, true);
-
-  var guardedWindowOpen = function (url) {
-    var value = url === undefined || url === null ? '' : String(url).trim();
-
-    // Vega does not support general window.open popups. For same-origin and
-    // primary-site transitions, perform the navigation synchronously in this
-    // WebView so sites such as Dofuz do not observe a blocked popup.
-    if (value && tryNavigateInCurrentWindow(value)) {
-      return window;
-    }
-
-    if (value && isBlockedHost(value)) {
-      postNavigationIntent(value, 'window.open', isTrustedGesture());
-      return window;
-    }
-
-    postNavigationIntent(value, 'window.open', isTrustedGesture());
-
-    // Keep a truthy Window-like return for popup-blocker feature detection.
+  // Vega is intentionally single-window. A website may use window.open as an
+  // advertising side effect of Play. Ignore it completely but return a truthy
+  // Window object so basic popup-blocker feature detection does not break the
+  // page's inline action.
+  var guardedWindowOpen = function () {
     return window;
   };
 
@@ -211,51 +135,30 @@ export const createPageGuardScript = (): string => {
     // The own window.open guard above is sufficient when the prototype is locked.
   }
 
+  // Explicit new-tab/new-window anchors are ignored. Standard same-window
+  // anchors are untouched and continue to navigate normally.
   document.addEventListener('click', function (event) {
-    markTrustedInteraction(event);
-
     var target = event.target;
     if (!target || typeof target.closest !== 'function') {
       return;
     }
 
     var anchor = target.closest('a[href]');
-    if (!anchor) {
+    if (!anchor || !anchorCreatesNewContext(anchor)) {
       return;
     }
 
-    var opensNewContext =
-      targetCreatesNewContext(anchor.getAttribute('target')) ||
-      (anchor.relList && anchor.relList.contains('external'));
-
-    if (!opensNewContext) {
-      return;
-    }
-
-    var href = anchor.getAttribute('href') || anchor.href;
-    if (!href) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    if (typeof event.stopImmediatePropagation === 'function') {
-      event.stopImmediatePropagation();
-    }
-
-    if (tryNavigateInCurrentWindow(href)) {
-      return;
-    }
-
-    postNavigationIntent(
-      href,
-      'blank-target',
-      event.isTrusted === true || isTrustedGesture()
-    );
+    consumeNewContextEvent(event);
   }, true);
 
+  // Forms that explicitly request another browsing context are ignored too.
+  // Same-window forms continue through the browser untouched.
   document.addEventListener('submit', function (event) {
-    neutralizeFormTarget(event.target, event.submitter || null);
+    if (!submitCreatesNewContext(event.target, event.submitter || null)) {
+      return;
+    }
+
+    consumeNewContextEvent(event);
   }, true);
 
   if (
@@ -264,8 +167,12 @@ export const createPageGuardScript = (): string => {
     typeof HTMLFormElement.prototype.submit === 'function'
   ) {
     var nativeFormSubmit = HTMLFormElement.prototype.submit;
+
     HTMLFormElement.prototype.submit = function () {
-      neutralizeFormTarget(this, null);
+      if (submitCreatesNewContext(this, null)) {
+        return undefined;
+      }
+
       return nativeFormSubmit.apply(this, arguments);
     };
   }
@@ -275,6 +182,7 @@ export const createPageGuardScript = (): string => {
       frame.remove();
       return true;
     }
+
     return false;
   }
 
@@ -287,35 +195,13 @@ export const createPageGuardScript = (): string => {
       return;
     }
 
-    if (node.tagName === 'BASE') {
-      neutralizeBaseTarget(node);
-    } else if (node.tagName === 'FORM') {
-      neutralizeFormTarget(node, null);
-    } else if (node.tagName === 'BUTTON' || node.tagName === 'INPUT') {
-      neutralizeSubmitterTarget(node);
-    }
-
     if (typeof node.querySelectorAll === 'function') {
       node.querySelectorAll('iframe[src]').forEach(cleanIframe);
-      node.querySelectorAll('base[target]').forEach(neutralizeBaseTarget);
-      node.querySelectorAll('form[target]').forEach(function (form) {
-        neutralizeFormTarget(form, null);
-      });
-      node.querySelectorAll('button[formtarget],input[formtarget]').forEach(
-        neutralizeSubmitterTarget
-      );
     }
   }
 
   function cleanInitialDocument() {
     document.querySelectorAll('iframe[src]').forEach(cleanIframe);
-    document.querySelectorAll('base[target]').forEach(neutralizeBaseTarget);
-    document.querySelectorAll('form[target]').forEach(function (form) {
-      neutralizeFormTarget(form, null);
-    });
-    document.querySelectorAll('button[formtarget],input[formtarget]').forEach(
-      neutralizeSubmitterTarget
-    );
   }
 
   if (document.readyState === 'loading') {
@@ -339,7 +225,7 @@ export const createPageGuardScript = (): string => {
 
   observer.observe(document.documentElement || document, {
     attributes: true,
-    attributeFilter: ['src', 'target', 'formtarget'],
+    attributeFilter: ['src'],
     childList: true,
     subtree: true
   });
