@@ -5,7 +5,7 @@ import {resolvePreferredDestinationIndex} from './homeFocusPolicy';
 import {
   KAYLANE_LOGO,
   KAYLANE_LOVE_LINES,
-  KAYLANE_MEMORIES_COLLAGE,
+  KAYLANE_MEMORIES_GRID,
 } from './kaylaneMemories';
 
 export type HomeDestination = {
@@ -33,12 +33,14 @@ export const DEFAULT_HOME_DESTINATIONS: readonly HomeDestination[] = [
 type DestinationCardProps = {
   destination: HomeDestination;
   preferredFocus: boolean;
+  side: 'left' | 'right';
   onOpen: (url: string) => void;
 };
 
 const DestinationCard = ({
   destination,
   preferredFocus,
+  side,
   onOpen,
 }: DestinationCardProps) => {
   const [focused, setFocused] = useState(false);
@@ -53,23 +55,33 @@ const DestinationCard = ({
       accessibilityRole="button"
       accessibilityLabel={`Ouvrir ${destination.label}`}
       accessibilityHint="Appuie sur OK pour ouvrir"
-      style={[styles.destinationCard, focused && styles.destinationCardFocused]}>
-      <View style={styles.destinationIcon}>
-        <Text style={styles.destinationIconText}>
-          {destination.label.slice(0, 1)}
-        </Text>
+      style={[
+        styles.destinationCard,
+        side === 'left' ? styles.movixCard : styles.dofuzCard,
+        focused && styles.destinationCardFocused,
+      ]}>
+      <View style={styles.cardTopRow}>
+        <View
+          style={[
+            styles.destinationBadge,
+            side === 'left' ? styles.movixBadge : styles.dofuzBadge,
+          ]}>
+          <Text style={styles.destinationBadgeText}>
+            {side === 'left' ? 'GAUCHE' : 'DROITE'}
+          </Text>
+        </View>
+        <Text style={styles.okHint}>OK pour ouvrir</Text>
       </View>
 
-      <View style={styles.destinationCopy}>
-        <Text numberOfLines={1} style={styles.destinationTitle}>
-          {destination.label}
-        </Text>
-        <Text numberOfLines={1} style={styles.destinationDescription}>
-          {destination.description}
-        </Text>
-      </View>
+      <Text style={styles.destinationTitle}>{destination.label}</Text>
+      <Text style={styles.destinationDescription}>
+        {destination.description}
+      </Text>
 
-      <Text style={styles.destinationArrow}>›</Text>
+      <View style={styles.openRow}>
+        <Text style={styles.openText}>Ouvrir {destination.label}</Text>
+        <Text style={styles.openArrow}>›</Text>
+      </View>
     </Pressable>
   );
 };
@@ -92,90 +104,69 @@ export const BrowserHome = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.ambientGlowOne} />
-      <View style={styles.ambientGlowTwo} />
+      <View style={styles.glowBlue} />
+      <View style={styles.glowPink} />
 
-      <View style={styles.brandRow}>
-        <Image source={KAYLANE_LOGO} resizeMode="cover" style={styles.logo} />
-
-        <View style={styles.brandCopy}>
-          <Text style={styles.title}>Kaylane TV</Text>
-          <Text style={styles.subtitle}>
-            Ta soirée, ton confort, notre petit coin à nous.
-          </Text>
+      <View style={styles.header}>
+        <View style={styles.brand}>
+          <Image source={KAYLANE_LOGO} resizeMode="cover" style={styles.logo} />
+          <View>
+            <Text style={styles.title}>Kaylane TV</Text>
+            <Text style={styles.subtitle}>Choisis ton site et profite de ta soirée.</Text>
+          </View>
         </View>
 
-        <View style={styles.loveBadge}>
-          <Text style={styles.loveBadgeHeart}>♥</Text>
-          <Text style={styles.loveBadgeText}>Pour Kaylane</Text>
+        <View style={styles.forKaylane}>
+          <Text style={styles.heart}>♥</Text>
+          <Text style={styles.forKaylaneText}>Pour Kaylane</Text>
         </View>
       </View>
 
-      <View style={styles.body}>
-        <View style={styles.leftColumn}>
-          <View style={styles.loveCard}>
-            <Text style={styles.eyebrow}>UN PETIT RAPPEL</Text>
-            <Text style={styles.loveHeadline}>
-              Je t’aime, je suis fier de toi et tu es l’amour de ma vie.
+      <View style={styles.destinationRow}>
+        {destinations.map((destination, index) => (
+          <DestinationCard
+            key={destination.id}
+            destination={destination}
+            preferredFocus={index === preferredIndex}
+            side={index === 0 ? 'left' : 'right'}
+            onOpen={onOpen}
+          />
+        ))}
+      </View>
+
+      <View style={styles.bottomRow}>
+        <View style={styles.photoPanel}>
+          <Image
+            source={KAYLANE_MEMORIES_GRID}
+            resizeMode="cover"
+            style={styles.photoGrid}
+          />
+          <View style={styles.photoLabel}>
+            <Text style={styles.photoLabelTitle}>Nos souvenirs ♥</Text>
+            <Text style={styles.photoLabelText}>
+              Des petits bouts de nous dans Kaylane TV.
             </Text>
-
-            <View style={styles.messageWrap}>
-              {KAYLANE_LOVE_LINES.map(line => (
-                <View key={line} style={styles.messageChip}>
-                  <Text style={styles.messageText}>{line}</Text>
-                </View>
-              ))}
-            </View>
-
-            <Text style={styles.signature}>— Charles ♥</Text>
-          </View>
-
-          <Text style={styles.sectionLabel}>OÙ ON ÉCOUTE ÇA ?</Text>
-
-          <View style={styles.actions}>
-            {destinations.map((destination, index) => (
-              <DestinationCard
-                key={destination.id}
-                destination={destination}
-                preferredFocus={index === preferredIndex}
-                onOpen={onOpen}
-              />
-            ))}
           </View>
         </View>
 
-        <View style={styles.rightColumn}>
-          <View style={styles.memoriesCard}>
-            <Image
-              source={KAYLANE_MEMORIES_COLLAGE}
-              resizeMode="cover"
-              style={styles.memoriesImage}
-            />
-            <View style={styles.memoriesScrim} />
-
-            <View style={styles.memoriesCopy}>
-              <Text style={styles.memoriesEyebrow}>NOS SOUVENIRS</Text>
-              <Text style={styles.memoriesTitle}>Nous deux ♥</Text>
-              <Text style={styles.memoriesCaption}>
-                Tous ces petits moments qui font ma vie plus belle avec toi.
-              </Text>
-            </View>
+        <View style={styles.loveColumn}>
+          <View style={styles.mainLoveCard}>
+            <Text style={styles.mainLoveText}>
+              Je t’aime. Je suis fier de toi.
+            </Text>
+            <Text style={styles.mainLoveSubtext}>
+              Tu es l’amour de ma vie.
+            </Text>
+            <Text style={styles.signature}>— Charles ♥</Text>
           </View>
 
-          <View style={styles.rightMessageRow}>
-            <View style={styles.rightMessageCard}>
-              <Text style={styles.rightMessageHeart}>♥</Text>
-              <Text style={styles.rightMessageText}>
-                Peu importe la journée, je suis toujours fier de toi.
-              </Text>
-            </View>
-
-            <View style={styles.rightMessageCard}>
-              <Text style={styles.rightMessageHeart}>♥</Text>
-              <Text style={styles.rightMessageText}>
-                Mon choix préféré sera toujours toi.
-              </Text>
-            </View>
+          <View style={styles.smallLoveRow}>
+            {KAYLANE_LOVE_LINES.slice(0, 2).map(line => (
+              <View key={line} style={styles.smallLoveCard}>
+                <Text style={styles.smallHeart}>♥</Text>
+                <Text style={styles.smallLoveText}>{line}</Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>
@@ -190,281 +181,266 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
     backgroundColor: '#050713',
-    paddingHorizontal: 38,
-    paddingTop: 28,
-    paddingBottom: 22,
+    paddingHorizontal: 40,
+    paddingTop: 26,
+    paddingBottom: 16,
   },
-  ambientGlowOne: {
+  glowBlue: {
+    position: 'absolute',
+    width: 580,
+    height: 580,
+    borderRadius: 290,
+    backgroundColor: '#173d87',
+    opacity: 0.18,
+    top: -330,
+    left: -120,
+  },
+  glowPink: {
     position: 'absolute',
     width: 520,
     height: 520,
     borderRadius: 260,
-    backgroundColor: '#132d73',
-    opacity: 0.26,
-    top: -250,
-    right: 180,
+    backgroundColor: '#6b1d67',
+    opacity: 0.12,
+    bottom: -320,
+    right: -120,
   },
-  ambientGlowTwo: {
-    position: 'absolute',
-    width: 460,
-    height: 460,
-    borderRadius: 230,
-    backgroundColor: '#5c165f',
-    opacity: 0.18,
-    bottom: -260,
-    left: 110,
-  },
-  brandRow: {
-    minHeight: 94,
+  header: {
+    minHeight: 82,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 22,
+    marginBottom: 18,
+  },
+  brand: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   logo: {
-    width: 88,
-    height: 88,
-    borderRadius: 22,
+    width: 72,
+    height: 72,
+    borderRadius: 17,
+    marginRight: 16,
     borderWidth: 1,
-    borderColor: '#3758a0',
-  },
-  brandCopy: {
-    flex: 1,
-    marginLeft: 20,
+    borderColor: '#4869bb',
   },
   title: {
     color: '#ffffff',
-    fontSize: 42,
-    lineHeight: 47,
-    fontWeight: '800',
-    letterSpacing: 0.4,
+    fontSize: 37,
+    lineHeight: 42,
+    fontWeight: '900',
   },
   subtitle: {
-    color: '#aebbd2',
-    fontSize: 18,
-    lineHeight: 24,
-    marginTop: 3,
+    color: '#b9c5da',
+    fontSize: 17,
+    lineHeight: 22,
+    marginTop: 2,
   },
-  loveBadge: {
+  forKaylane: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#513d75',
-    backgroundColor: '#17152a',
+    borderColor: '#634b8e',
+    backgroundColor: '#17162a',
     paddingHorizontal: 18,
-    paddingVertical: 11,
+    paddingVertical: 10,
   },
-  loveBadgeHeart: {
-    color: '#ff7fbe',
-    fontSize: 20,
+  heart: {
+    color: '#ff83bd',
+    fontSize: 19,
     marginRight: 8,
   },
-  loveBadgeText: {
-    color: '#f3eaf7',
+  forKaylaneText: {
+    color: '#f5eafa',
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '800',
   },
-  body: {
-    flex: 1,
+  destinationRow: {
+    height: 230,
     flexDirection: 'row',
-    gap: 24,
-  },
-  leftColumn: {
-    width: '42%',
-  },
-  rightColumn: {
-    flex: 1,
-    gap: 12,
-  },
-  loveCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#202d4b',
-    backgroundColor: 'rgba(13, 20, 37, 0.96)',
-    paddingHorizontal: 22,
-    paddingTop: 20,
-    paddingBottom: 18,
-  },
-  eyebrow: {
-    color: '#82a8ff',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  loveHeadline: {
-    color: '#ffffff',
-    fontSize: 24,
-    lineHeight: 31,
-    fontWeight: '800',
-    marginTop: 7,
-  },
-  messageWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 14,
-  },
-  messageChip: {
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#293858',
-    backgroundColor: '#151e34',
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-  },
-  messageText: {
-    color: '#dce6f6',
-    fontSize: 14,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-  signature: {
-    color: '#ff8ec4',
-    fontSize: 15,
-    fontWeight: '700',
-    marginTop: 13,
-  },
-  sectionLabel: {
-    color: '#8493aa',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-    marginTop: 17,
-    marginBottom: 9,
-  },
-  actions: {
-    gap: 11,
+    gap: 22,
+    marginBottom: 18,
   },
   destinationCard: {
-    minHeight: 88,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#26334e',
-    backgroundColor: '#10182a',
-    paddingHorizontal: 17,
-    paddingVertical: 12,
+    flex: 1,
+    borderRadius: 26,
+    borderWidth: 4,
+    paddingHorizontal: 26,
+    paddingVertical: 21,
+    justifyContent: 'space-between',
+  },
+  movixCard: {
+    backgroundColor: '#111c34',
+    borderColor: '#35599c',
+  },
+  dofuzCard: {
+    backgroundColor: '#1a1531',
+    borderColor: '#6b4195',
   },
   destinationCardFocused: {
     borderColor: '#ffffff',
-    backgroundColor: '#192642',
-    transform: [{scale: 1.02}],
+    transform: [{scale: 1.018}],
   },
-  destinationIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+  cardTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#23345c',
   },
-  destinationIconText: {
+  destinationBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  movixBadge: {
+    backgroundColor: '#315baa',
+  },
+  dofuzBadge: {
+    backgroundColor: '#834db4',
+  },
+  destinationBadgeText: {
     color: '#ffffff',
-    fontSize: 26,
+    fontSize: 12,
     fontWeight: '900',
+    letterSpacing: 1,
   },
-  destinationCopy: {
-    flex: 1,
-    marginLeft: 15,
+  okHint: {
+    marginLeft: 'auto',
+    color: '#aebdd4',
+    fontSize: 14,
+    fontWeight: '700',
   },
   destinationTitle: {
     color: '#ffffff',
-    fontSize: 25,
-    lineHeight: 30,
-    fontWeight: '800',
+    fontSize: 43,
+    lineHeight: 48,
+    fontWeight: '900',
   },
   destinationDescription: {
-    color: '#aebbd0',
-    fontSize: 15,
-    lineHeight: 20,
-    marginTop: 2,
+    color: '#c7d2e4',
+    fontSize: 18,
+    lineHeight: 23,
   },
-  destinationArrow: {
-    color: '#b9c9e8',
-    fontSize: 42,
-    lineHeight: 44,
-    marginLeft: 12,
+  openRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  memoriesCard: {
+  openText: {
+    color: '#ffffff',
+    fontSize: 18,
+    lineHeight: 23,
+    fontWeight: '800',
+  },
+  openArrow: {
+    color: '#ffffff',
+    fontSize: 35,
+    lineHeight: 35,
+    marginLeft: 8,
+  },
+  bottomRow: {
     flex: 1,
+    minHeight: 0,
+    flexDirection: 'row',
+    gap: 20,
+  },
+  photoPanel: {
+    flex: 1.3,
     overflow: 'hidden',
-    borderRadius: 24,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: '#293856',
+    borderColor: '#283753',
     backgroundColor: '#0d1424',
   },
-  memoriesImage: {
+  photoGrid: {
     width: '100%',
     height: '100%',
   },
-  memoriesScrim: {
+  photoLabel: {
     position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '48%',
-    backgroundColor: 'rgba(3, 7, 18, 0.63)',
+    left: 18,
+    right: 18,
+    bottom: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(5, 9, 21, 0.82)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  memoriesCopy: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    bottom: 20,
-  },
-  memoriesEyebrow: {
-    color: '#a8bfff',
-    fontSize: 13,
-    fontWeight: '800',
-    letterSpacing: 1.4,
-  },
-  memoriesTitle: {
+  photoLabelTitle: {
     color: '#ffffff',
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 20,
+    lineHeight: 24,
     fontWeight: '900',
-    marginTop: 4,
   },
-  memoriesCaption: {
-    color: '#e7edf7',
-    fontSize: 16,
-    lineHeight: 22,
-    marginTop: 5,
+  photoLabelText: {
+    color: '#d7dfed',
+    fontSize: 14,
+    lineHeight: 18,
+    marginTop: 2,
   },
-  rightMessageRow: {
-    height: 82,
+  loveColumn: {
+    flex: 0.9,
+    gap: 12,
+  },
+  mainLoveCard: {
+    flex: 1,
+    justifyContent: 'center',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: '#2c3957',
+    backgroundColor: '#10182a',
+    paddingHorizontal: 22,
+  },
+  mainLoveText: {
+    color: '#ffffff',
+    fontSize: 27,
+    lineHeight: 34,
+    fontWeight: '900',
+  },
+  mainLoveSubtext: {
+    color: '#ffb4d5',
+    fontSize: 22,
+    lineHeight: 29,
+    fontWeight: '800',
+    marginTop: 6,
+  },
+  signature: {
+    color: '#95a8c7',
+    fontSize: 15,
+    lineHeight: 20,
+    fontWeight: '700',
+    marginTop: 13,
+  },
+  smallLoveRow: {
+    height: 86,
     flexDirection: 'row',
     gap: 12,
   },
-  rightMessageCard: {
+  smallLoveCard: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#26344f',
-    backgroundColor: '#10182a',
-    paddingHorizontal: 16,
+    borderColor: '#293858',
+    backgroundColor: '#151e34',
+    paddingHorizontal: 14,
   },
-  rightMessageHeart: {
-    color: '#ff81bd',
-    fontSize: 19,
-    marginRight: 10,
+  smallHeart: {
+    color: '#ff83bd',
+    fontSize: 18,
+    marginRight: 8,
   },
-  rightMessageText: {
+  smallLoveText: {
     flex: 1,
-    color: '#dce6f6',
+    color: '#edf2fa',
     fontSize: 14,
-    lineHeight: 19,
-    fontWeight: '600',
+    lineHeight: 18,
+    fontWeight: '700',
   },
   footer: {
     alignSelf: 'center',
-    color: '#6f7d94',
+    color: '#707f97',
     fontSize: 12,
     lineHeight: 16,
-    marginTop: 10,
-    letterSpacing: 0.5,
+    marginTop: 9,
   },
 });
