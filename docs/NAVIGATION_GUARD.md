@@ -85,3 +85,17 @@ Agent A / Lead integration code must:
 - never use `BLOCKED_AD_NAVIGATION_HOSTS` as a blanket network/subresource denylist.
 
 Physical Vega hardware validation remains mandatory for injection timing, Fire TV Enter/OK semantics, fullscreen controls, Movix/Dofuz playback and repeated-navigation stability.
+
+
+## Physical Fire TV hardening: same-tab ad redirects
+
+Physical testing showed two additional popup/ad patterns:
+
+1. a site calls `window.open()`, receives a truthy value, then assigns to the returned object's `location`; and
+2. a primary page attempts to leave Movix/Dofuz in the current tab through an ordinary link, form, or scripted Navigation API transition.
+
+Kaylane TV now returns an isolated popup stub rather than the real `window`. Writes such as `popup.location.href = ...`, `assign()`, or `replace()` remain inside the stub and cannot redirect the only WebView.
+
+On a primary Movix/Dofuz top document, explicit same-tab escapes to unrelated HTTPS hosts are consumed. This guard is scoped to the frame's own hostname, so third-party player/media iframes are not globally denied. Known nuisance hosts remain blocked independently.
+
+When Chromium's Navigation API is available, the guard also cancels matching scripted top-level transitions. This closes the `location`/scripted-navigation path without adding polling.
