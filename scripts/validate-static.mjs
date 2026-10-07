@@ -16,6 +16,7 @@ const app = JSON.parse(read('app.json'));
 const manifest = read('manifest.toml');
 const config = read('src/config.ts');
 const appSource = read('src/App.tsx');
+const playerCompatSource = read('src/injected/playerCompat.ts');
 
 const expected = {
   packageId: 'com.kaylanetv.browser',
@@ -89,6 +90,11 @@ expect(appSource.includes('mixedContentMode="never"'), 'WebView mixed content mu
 expect(appSource.includes('allowJavaScriptInBackground={false}'), 'Background JavaScript must remain disabled.');
 expect(appSource.includes('domStorageEnabled={true}'), 'DOM storage must remain enabled for normal browsing.');
 expect(appSource.includes('allowsDefaultMediaControl={true}'), 'Default WebView media controls must remain enabled.');
+expect(appSource.includes('thirdPartyCookiesEnabled={true}'), 'Third-party cookies must remain enabled for embedded-player compatibility.');
+expect(appSource.includes('mediaPlaybackRequiresUserAction={false}'), 'HTML5 media compatibility mode must allow playback without an additional WebView gesture gate.');
+expect(appSource.includes('createPlayerCompatibilityScript'), 'Player compatibility bootstrap must remain installed.');
+expect(playerCompatSource.includes('disableRemotePlayback = true'), 'Player compatibility must disable unsupported remote playback surfaces.');
+expect(!playerCompatSource.includes('setInterval('), 'Player compatibility must not use permanent polling.');
 expect(appSource.includes('callback.cancel();'), 'SSL error handler must explicitly fail closed.');
 expect(appSource.includes('if (__DEV__)'), 'WebView diagnostics must stay development-only.');
 
