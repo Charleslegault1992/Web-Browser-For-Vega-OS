@@ -1,9 +1,10 @@
-import {BLOCKED_AD_NAVIGATION_HOSTS} from '../navigation/rules';
+import {BLOCKED_AD_NAVIGATION_HOSTS, PRIMARY_HOSTS} from '../navigation/rules';
 
 const TRUSTED_GESTURE_WINDOW_MS = 1200;
 
 export const createPageGuardScript = (): string => {
   const blockedHosts = JSON.stringify(BLOCKED_AD_NAVIGATION_HOSTS);
+  const primaryHosts = JSON.stringify(PRIMARY_HOSTS);
   const gestureWindow = String(TRUSTED_GESTURE_WINDOW_MS);
 
   return `
@@ -13,13 +14,14 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 3 }),
+    value: Object.freeze({ version: 4 }),
     configurable: false,
     enumerable: false,
     writable: false
   });
 
   var BLOCKED_HOSTS = ${blockedHosts};
+  var PRIMARY_HOSTS = ${primaryHosts};
   var TRUSTED_GESTURE_WINDOW_MS = ${gestureWindow};
   var lastTrustedInteractionAt = 0;
 
@@ -39,15 +41,51 @@ export const createPageGuardScript = (): string => {
     );
   }
 
-  function isBlockedHost(url) {
+  function parseHttpsDestination(url) {
     try {
       var parsed = new URL(url, document.baseURI);
-      return BLOCKED_HOSTS.some(function (rule) {
-        return hostMatchesRule(parsed.hostname, rule);
-      });
+      return parsed.protocol === 'https:' ? parsed : null;
     } catch (_) {
+      return null;
+    }
+  }
+
+  function isBlockedHost(url) {
+    var parsed = parseHttpsDestination(url);
+    if (!parsed) {
       return false;
     }
+
+    return BLOCKED_HOSTS.some(function (rule) {
+      return hostMatchesRule(parsed.hostname, rule);
+    });
+  }
+
+  function isPrimaryHostname(hostname) {
+    return PRIMARY_HOSTS.some(function (rule) {
+      return hostMatchesRule(hostname, rule);
+    });
+  }
+
+  function tryNavigateInCurrentWindow(url) {
+    var destination = parseHttpsDestination(url);
+    var current = parseHttpsDestination(window.location.href);
+
+    if (!destination || !current || isBlockedHost(destination.href)) {
+      return false;
+    }
+
+    var sameOrigin = destination.origin === current.origin;
+    var primaryToPrimary =
+      isPrimaryHostname(current.hostname) &&
+      isPrimaryHostname(destination.hostname);
+
+    if (!sameOrigin && !primaryToPrimary) {
+      return false;
+    }
+
+    window.location.assign(destination.href);
+    return true;
   }
 
   function markTrustedInteraction(event) {
@@ -129,11 +167,23 @@ export const createPageGuardScript = (): string => {
   }, true);
 
   var guardedWindowOpen = function (url) {
-    postNavigationIntent(url, 'window.open', isTrustedGesture());
+    var value = url === undefined || url === null ? '' : String(url).trim();
 
-    // Returning the current window keeps single-window behavior while avoiding
-    // false "popup blocked" detection on sites that only check the return
-    // value of window.open before continuing their legitimate flow.
+    // Vega does not support general window.open popups. For same-origin and
+    // primary-site transitions, perform the navigation synchronously in this
+    // WebView so sites such as Dofuz do not observe a blocked popup.
+    if (value && tryNavigateInCurrentWindow(value)) {
+      return window;
+    }
+
+    if (value && isBlockedHost(value)) {
+      postNavigationIntent(value, 'window.open', isTrustedGesture());
+      return window;
+    }
+
+    postNavigationIntent(value, 'window.open', isTrustedGesture());
+
+    // Keep a truthy Window-like return for popup-blocker feature detection.
     return window;
   };
 
@@ -191,6 +241,10 @@ export const createPageGuardScript = (): string => {
     event.stopPropagation();
     if (typeof event.stopImmediatePropagation === 'function') {
       event.stopImmediatePropagation();
+    }
+
+    if (tryNavigateInCurrentWindow(href)) {
+      return;
     }
 
     postNavigationIntent(
