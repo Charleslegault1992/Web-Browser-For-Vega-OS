@@ -4,6 +4,7 @@ schema-version = 1
 title = "Kaylane TV"
 version = "0.1.0"
 id = "com.kaylanetv.browser"
+icon = "@image/kaylane-tv.png"
 
 [os.version]
 min = "1.2"
