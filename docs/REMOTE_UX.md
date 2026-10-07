@@ -5,9 +5,7 @@
 Kaylane TV must be fully usable with a Fire TV Vega remote only. No mouse,
 touchscreen, or keyboard is required for the core journey.
 
-This scope deliberately prefers Vega/WebView native spatial navigation. Custom
-global DPAD interception, focus polling, per-frame work, and continuous timers
-are not part of the design.
+This scope uses native TV focus on Kaylane TV home. Inside web content, physical Fire TV testing required an explicit two-mode browser input model: pointer mode temporarily owns D-pad/Select, while selection mode restores Vega/player native spatial navigation. Focus polling and permanent timers are still avoided.
 
 ## Home
 
@@ -33,11 +31,9 @@ When opening a site:
 
 1. the native home unmounts;
 2. the single WebView mounts with `hasTVPreferredFocus={true}`;
-3. Vega/WebView spatial navigation owns page DPAD behavior;
-4. no native overlay is allowed to take focus during normal playback.
-
-Do not inject a global DOM focus engine unless physical testing proves a
-specific site cannot be used with Vega's built-in spatial navigation.
+3. Kaylane pointer mode owns D-pad/Select by default;
+4. holding OK switches to native selection mode for player controls;
+5. no native overlay is allowed to take focus during normal playback.
 
 ## WebView -> native focus
 
@@ -107,9 +103,9 @@ between page JavaScript and the native shell.
 Expected ownership:
 
 - Home: native `Pressable` focus.
-- Web content: WebView's built-in spatial navigation.
-- OK/Select: native press on app chrome, DOM activation inside WebView.
-- No global ArrowUp/Down/Left/Right listener in React Native.
+- Web content pointer mode: app-level Vega input listeners move/click the injected pointer.
+- Web content selection mode: WebView/player native spatial navigation.
+- Hold OK for about 700 ms to switch modes.
 - No focus polling.
 - No periodic DOM scan.
 
@@ -192,12 +188,12 @@ Agent C runtime code contains:
 
 - zero polling loops;
 - zero permanent intervals;
-- zero frame callbacks;
+- frame callbacks only while pointer motion is active;
 - one BackHandler subscription per mounted shell;
+- bounded Vega D-pad/Select override subscriptions only in pointer mode;
 - local focus state only for currently rendered native buttons/cards;
 - no React playback-progress state;
-- no global DPAD listener;
-- no global DOM focus engine.
+- no global DOM focus polling engine.
 
 The 180 ms Back protection compares timestamps only when a Back event arrives;
 it schedules no timer.
