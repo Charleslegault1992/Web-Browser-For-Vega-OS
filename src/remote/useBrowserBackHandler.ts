@@ -12,24 +12,33 @@ export type BrowserBackController = {
   goHome: () => void;
 };
 
-export const useBrowserBackHandler = (
-  controller: BrowserBackController,
-): void => {
+export const useBrowserBackHandler = ({
+  overlayOpen,
+  canGoBack,
+  isAtHome,
+  dismissOverlay,
+  goBack,
+  goHome,
+}: BrowserBackController): void => {
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        const action = decideBackAction(controller);
+        const action = decideBackAction({
+          overlayOpen,
+          canGoBack,
+          isAtHome,
+        });
 
         switch (action) {
           case 'dismiss-overlay':
-            controller.dismissOverlay();
+            dismissOverlay();
             return true;
           case 'webview-back':
-            controller.goBack();
+            goBack();
             return true;
           case 'go-home':
-            controller.goHome();
+            goHome();
             return true;
           case 'system-default':
             return false;
@@ -38,5 +47,12 @@ export const useBrowserBackHandler = (
     );
 
     return () => subscription.remove();
-  }, [controller]);
+  }, [
+    overlayOpen,
+    canGoBack,
+    isAtHome,
+    dismissOverlay,
+    goBack,
+    goHome,
+  ]);
 };
