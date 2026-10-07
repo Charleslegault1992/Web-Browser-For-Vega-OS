@@ -5,7 +5,7 @@ export const createRemotePointerScript = (): string => `
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 2 }),
+    value: Object.freeze({ version: 3 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -21,9 +21,12 @@ export const createRemotePointerScript = (): string => `
   var velocityX = 0;
   var velocityY = 0;
   var cursor = null;
+  var modeBadge = null;
   var hoverTarget = null;
   var animationFrame = 0;
   var lastFrameAt = 0;
+  var badgeTimer = 0;
+  var mode = 'pointer';
   var keys = {
     ArrowLeft: false,
     ArrowRight: false,
@@ -49,8 +52,50 @@ export const createRemotePointerScript = (): string => `
     );
   }
 
+  function fullscreenElement() {
+    return (
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      null
+    );
+  }
+
+  function pointerHost() {
+    var fullscreen = fullscreenElement();
+
+    if (fullscreen && typeof fullscreen.appendChild === 'function') {
+      return fullscreen;
+    }
+
+    return document.documentElement || document.body;
+  }
+
+  function ensureUiAttached() {
+    var host = pointerHost();
+    if (!host) {
+      return;
+    }
+
+    if (cursor && cursor.parentNode !== host) {
+      try {
+        host.appendChild(cursor);
+      } catch (_) {}
+    }
+
+    if (modeBadge && modeBadge.parentNode !== host) {
+      try {
+        host.appendChild(modeBadge);
+      } catch (_) {}
+    }
+  }
+
   function createCursor() {
-    if (cursor || !document.documentElement) {
+    if (cursor) {
+      ensureUiAttached();
+      return;
+    }
+
+    if (!document.documentElement) {
       return;
     }
 
@@ -88,8 +133,58 @@ export const createRemotePointerScript = (): string => `
     dot.style.pointerEvents = 'none';
 
     cursor.appendChild(dot);
-    document.documentElement.appendChild(cursor);
-    render();
+    ensureUiAttached();
+  }
+
+  function createModeBadge() {
+    if (modeBadge || !document.documentElement) {
+      return;
+    }
+
+    modeBadge = document.createElement('div');
+    modeBadge.setAttribute('data-kaylane-pointer-mode', 'true');
+    modeBadge.setAttribute('aria-hidden', 'true');
+    modeBadge.style.position = 'fixed';
+    modeBadge.style.right = '26px';
+    modeBadge.style.top = '24px';
+    modeBadge.style.zIndex = '2147483647';
+    modeBadge.style.pointerEvents = 'none';
+    modeBadge.style.padding = '10px 14px';
+    modeBadge.style.borderRadius = '999px';
+    modeBadge.style.border = '2px solid rgba(255,255,255,0.9)';
+    modeBadge.style.background = 'rgba(5,9,21,0.86)';
+    modeBadge.style.color = '#ffffff';
+    modeBadge.style.fontFamily = 'sans-serif';
+    modeBadge.style.fontSize = '16px';
+    modeBadge.style.fontWeight = '700';
+    modeBadge.style.opacity = '0';
+    modeBadge.style.transition = 'opacity 120ms linear';
+    ensureUiAttached();
+  }
+
+  function announceMode(initial) {
+    createModeBadge();
+    if (!modeBadge) {
+      return;
+    }
+
+    if (badgeTimer) {
+      clearTimeout(badgeTimer);
+      badgeTimer = 0;
+    }
+
+    modeBadge.textContent =
+      mode === 'pointer'
+        ? 'Pointeur • Maintiens OK : sélection'
+        : 'Sélection • Maintiens OK : pointeur';
+    modeBadge.style.opacity = '1';
+
+    badgeTimer = setTimeout(function () {
+      badgeTimer = 0;
+      if (modeBadge) {
+        modeBadge.style.opacity = initial ? '0.68' : '0';
+      }
+    }, initial ? 2200 : 1500);
   }
 
   function elementAtPointer() {
@@ -117,6 +212,10 @@ export const createRemotePointerScript = (): string => `
   }
 
   function updateHover() {
+    if (mode !== 'pointer') {
+      return;
+    }
+
     var next = elementAtPointer();
 
     if (next === hoverTarget) {
@@ -131,10 +230,14 @@ export const createRemotePointerScript = (): string => `
   }
 
   function render() {
+    createCursor();
+    ensureUiAttached();
+
     if (!cursor) {
       return;
     }
 
+    cursor.style.display = mode === 'pointer' ? 'block' : 'none';
     cursor.style.transform =
       'translate3d(' +
       Math.round(x - SIZE / 2) +
@@ -169,9 +272,25 @@ export const createRemotePointerScript = (): string => `
     );
   }
 
+  function stopMotion() {
+    keys.ArrowLeft = false;
+    keys.ArrowRight = false;
+    keys.ArrowUp = false;
+    keys.ArrowDown = false;
+    velocityX = 0;
+    velocityY = 0;
+    lastFrameAt = 0;
+  }
+
   function tick(now) {
     animationFrame = 0;
     createCursor();
+
+    if (mode !== 'pointer') {
+      stopMotion();
+      render();
+      return;
+    }
 
     if (!lastFrameAt) {
       lastFrameAt = now;
@@ -229,16 +348,34 @@ export const createRemotePointerScript = (): string => `
   }
 
   function ensureAnimation() {
-    if (!animationFrame) {
+    if (mode === 'pointer' && !animationFrame) {
       animationFrame = window.requestAnimationFrame(tick);
     }
   }
 
+  function setDirection(key, pressed) {
+    if (!Object.prototype.hasOwnProperty.call(keys, key)) {
+      return;
+    }
+
+    if (mode !== 'pointer') {
+      keys[key] = false;
+      return;
+    }
+
+    keys[key] = Boolean(pressed);
+    ensureAnimation();
+  }
+
   function activate() {
+    if (mode !== 'pointer') {
+      return;
+    }
+
     createCursor();
 
     var target = elementAtPointer();
-    if (!target || target === cursor) {
+    if (!target || target === cursor || target === modeBadge) {
       return;
     }
 
@@ -262,6 +399,26 @@ export const createRemotePointerScript = (): string => `
     }
   }
 
+  function setMode(nextMode, shouldAnnounce) {
+    var next = nextMode === 'focus' ? 'focus' : 'pointer';
+    if (mode === next) {
+      render();
+      return;
+    }
+
+    mode = next;
+    stopMotion();
+    render();
+
+    if (shouldAnnounce !== false) {
+      announceMode(false);
+    }
+  }
+
+  function toggleMode() {
+    setMode(mode === 'pointer' ? 'focus' : 'pointer', true);
+  }
+
   function consume(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -277,10 +434,13 @@ export const createRemotePointerScript = (): string => `
   document.addEventListener(
     'keydown',
     function (event) {
+      if (mode !== 'pointer') {
+        return;
+      }
+
       if (isDirectionKey(event.key)) {
         consume(event);
-        keys[event.key] = true;
-        ensureAnimation();
+        setDirection(event.key, true);
         return;
       }
 
@@ -297,25 +457,32 @@ export const createRemotePointerScript = (): string => `
   document.addEventListener(
     'keyup',
     function (event) {
-      if (!isDirectionKey(event.key)) {
+      if (mode !== 'pointer' || !isDirectionKey(event.key)) {
         return;
       }
 
       consume(event);
-      keys[event.key] = false;
-      ensureAnimation();
+      setDirection(event.key, false);
     },
     true
   );
 
+  function handleFullscreenChange() {
+    ensureUiAttached();
+    render();
+    announceMode(false);
+  }
+
+  document.addEventListener('fullscreenchange', handleFullscreenChange, true);
+  document.addEventListener('webkitfullscreenchange', handleFullscreenChange, true);
+
   window.addEventListener('blur', function () {
-    keys.ArrowLeft = false;
-    keys.ArrowRight = false;
-    keys.ArrowUp = false;
-    keys.ArrowDown = false;
-    velocityX = 0;
-    velocityY = 0;
-    lastFrameAt = 0;
+    stopMotion();
+  });
+
+  window.addEventListener('focus', function () {
+    ensureUiAttached();
+    render();
   });
 
   window.addEventListener('resize', function () {
@@ -325,10 +492,38 @@ export const createRemotePointerScript = (): string => `
     render();
   });
 
+  Object.defineProperty(window, '__KAYLANE_TV_POINTER_API__', {
+    value: Object.freeze({
+      setMode: setMode,
+      toggleMode: toggleMode,
+      setDirection: setDirection,
+      activate: activate,
+      refresh: function () {
+        ensureUiAttached();
+        render();
+      }
+    }),
+    configurable: false,
+    enumerable: false,
+    writable: false
+  });
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', createCursor, {once: true});
+    document.addEventListener(
+      'DOMContentLoaded',
+      function () {
+        createCursor();
+        createModeBadge();
+        render();
+        announceMode(true);
+      },
+      {once: true}
+    );
   } else {
     createCursor();
+    createModeBadge();
+    render();
+    announceMode(true);
   }
 
   return true;
