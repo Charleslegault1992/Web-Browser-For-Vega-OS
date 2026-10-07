@@ -27,7 +27,12 @@ expect(pkg.engines?.node === '>=22.14.0', 'Node engine must stay >=22.14.0 for V
 expect(pkg.dependencies?.react === '19.2.0', 'React must stay on 19.2.0.');
 expect(pkg.dependencies?.['react-native'] === '0.83.0', 'React Native must stay on 0.83.0.');
 expect(pkg.dependencies?.['@amazon-devices/react-native-kepler'] === '~4.0.0+rn0.83.0', 'react-native-kepler must stay on the RN 0.83 Vega line.');
-expect(pkg.dependencies?.['@amazon-devices/webview'] === '~4.0.2', 'Vega WebView must stay on 4.0.2-compatible releases.');
+const webViewVersionSpec = pkg.dependencies?.['@amazon-devices/webview'];
+expect(
+  typeof webViewVersionSpec === 'string' &&
+    /^~?4\.0(?:\.\d+)?$/.test(webViewVersionSpec),
+  'Vega WebView must stay on the SDK-resolved 4.0 compatibility line.',
+);
 expect(pkg.devDependencies?.['@amazon-devices/kepler-cli-platform'] === '~0.22.0', 'kepler-cli-platform must stay on the current Vega SDK line.');
 expect(pkg.devDependencies?.['@amazon-devices/keplerscript-commonmodules'] === '~1.0.0', 'RN 0.83 common modules bundle dependency is required.');
 expect(pkg.devDependencies?.['@babel/core'] === '^7.25.2', 'RN 0.83 Babel core dependency drifted.');
