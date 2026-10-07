@@ -3,19 +3,33 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and renders a non-intercepting cursor overlay', () => {
+  it('is idempotent and exposes the v3 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
-    expect(script).toContain('version: 2');
+    expect(script).toContain('version: 3');
+    expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
+    expect(script).toContain('setMode: setMode');
+    expect(script).toContain('setDirection: setDirection');
+    expect(script).toContain('activate: activate');
+  });
+
+  it('renders a non-intercepting cursor overlay', () => {
     expect(script).toContain("cursor.style.pointerEvents = 'none'");
     expect(script).toContain("cursor.style.zIndex = '2147483647'");
   });
 
-  it('maps D-pad arrows and Enter to pointer movement/activation', () => {
-    expect(script).toContain("event.key === 'Enter'");
-    expect(script).toContain("keys[event.key] = true");
-    expect(script).toContain("keys[event.key] = false");
-    expect(script).toContain('event.preventDefault()');
-    expect(script).toContain('activate();');
+  it('keeps the pointer attached when fullscreen changes', () => {
+    expect(script).toContain('document.fullscreenElement');
+    expect(script).toContain('document.webkitFullscreenElement');
+    expect(script).toContain("document.addEventListener('fullscreenchange'");
+    expect(script).toContain("document.addEventListener('webkitfullscreenchange'");
+    expect(script).toContain('ensureUiAttached()');
+  });
+
+  it('supports pointer and native focus modes', () => {
+    expect(script).toContain("nextMode === 'focus' ? 'focus' : 'pointer'");
+    expect(script).toContain("mode === 'pointer' ? 'focus' : 'pointer'");
+    expect(script).toContain("cursor.style.display = mode === 'pointer' ? 'block' : 'none'");
+    expect(script).toContain('Maintiens OK');
   });
 
   it('uses a frame-timed velocity model for smooth movement', () => {
