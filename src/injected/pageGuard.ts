@@ -13,7 +13,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 2 }),
+    value: Object.freeze({ version: 3 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -130,7 +130,11 @@ export const createPageGuardScript = (): string => {
 
   var guardedWindowOpen = function (url) {
     postNavigationIntent(url, 'window.open', isTrustedGesture());
-    return null;
+
+    // Returning the current window keeps single-window behavior while avoiding
+    // false "popup blocked" detection on sites that only check the return
+    // value of window.open before continuing their legitimate flow.
+    return window;
   };
 
   try {
@@ -189,7 +193,11 @@ export const createPageGuardScript = (): string => {
       event.stopImmediatePropagation();
     }
 
-    postNavigationIntent(href, 'blank-target', event.isTrusted === true);
+    postNavigationIntent(
+      href,
+      'blank-target',
+      event.isTrusted === true || isTrustedGesture()
+    );
   }, true);
 
   document.addEventListener('submit', function (event) {
