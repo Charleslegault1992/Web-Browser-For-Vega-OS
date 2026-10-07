@@ -5,6 +5,8 @@ import {WebView} from '@amazon-devices/webview';
 import {APP_CONFIG} from './config';
 import type {BrowserNavigationState} from './types/webview';
 
+const HOME_SOURCE = {uri: APP_CONFIG.homeUrl} as const;
+
 export const App = () => {
   const webViewRef = useRef<React.ElementRef<typeof WebView> | null>(null);
   const navigationStateRef = useRef<BrowserNavigationState>({
@@ -26,8 +28,8 @@ export const App = () => {
 
       navigationStateRef.current = {
         url: url ?? previous.url,
-        canGoBack: Boolean(canGoBack),
-        canGoForward: Boolean(canGoForward),
+        canGoBack: canGoBack ?? previous.canGoBack,
+        canGoForward: canGoForward ?? previous.canGoForward,
       };
     },
     [],
@@ -39,14 +41,28 @@ export const App = () => {
         ref={webViewRef}
         style={styles.webView}
         hasTVPreferredFocus={true}
-        source={{uri: APP_CONFIG.homeUrl}}
+        source={HOME_SOURCE}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         allowJavaScriptInBackground={false}
+        mixedContentMode="never"
         allowsDefaultMediaControl={true}
         onLoad={handleLoad}
         onError={event => {
-          console.warn('Kaylane TV WebView error', event.nativeEvent);
+          if (__DEV__) {
+            console.warn('Kaylane TV WebView error', event.nativeEvent);
+          }
+        }}
+        onHttpError={event => {
+          if (__DEV__ && event.nativeEvent.isMainFrame) {
+            console.warn('Kaylane TV WebView HTTP error', event.nativeEvent);
+          }
+        }}
+        onSslError={(sslError, callback) => {
+          if (__DEV__) {
+            console.warn('Kaylane TV WebView SSL error', sslError);
+          }
+          callback.cancel();
         }}
       />
     </View>
