@@ -15,14 +15,14 @@ Those resources are not denied merely because they are cross-origin.
 
 ## Layers
 
-1. `window.open` is neutralized before it can create a new context.
+1. `window.open` is neutralized before it can create a new context and locked against later reassignment when Chromium permits it.
 2. New-context anchor clicks (`_blank`, `_new`, named targets, `rel=external`) are captured and reported to native code.
 3. New-context form targets are forced into `_self`, including direct `form.submit()` calls.
 4. Dynamic `<base target>` values that would create a second context are normalized to `_self`.
 5. Native policy decides allow / same-window / block for navigation intents.
 6. Vega `onShouldStartLoadWithRequest` must apply `shouldAllowWebViewNavigation()` so JS redirects, `location.assign`, `location.replace`, `top.location`, `parent.location`, ordinary link navigation and server redirects cannot bypass the native policy.
 7. A small ad-host set is used only for nuisance navigation and targeted blocked-iframe cleanup.
-8. MutationObserver inspects added nodes and only `src`/`target` attribute mutations; it never periodically rescans the full document.
+8. MutationObserver inspects added nodes and only `src`/`target`/`formtarget` attribute mutations; it never periodically rescans the full document.
 
 ## Trusted gesture model
 
@@ -71,7 +71,7 @@ The page guard is idempotent and installs one set of listeners plus one Mutation
 - no animation-frame work;
 - no permanent whole-document scan;
 - one initial targeted `iframe[src]` / `base[target]` scan;
-- incremental work only for newly added nodes and relevant `src` / `target` mutations.
+- incremental work only for newly added nodes and relevant `src` / `target` / `formtarget` mutations.
 
 The blocked-host list remains intentionally small and is not evaluated against every network request.
 

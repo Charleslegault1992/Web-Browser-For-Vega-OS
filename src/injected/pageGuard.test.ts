@@ -8,8 +8,10 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('version: 2');
   });
 
-  it('neutralizes window.open without creating another browsing context', () => {
-    expect(script).toContain("window.open = function (url)");
+  it('neutralizes and locks window.open without creating another context', () => {
+    expect(script).toContain('var guardedWindowOpen = function (url)');
+    expect(script).toContain("Object.defineProperty(window, 'open'");
+    expect(script).toContain("Object.defineProperty(Window.prototype, 'open'");
     expect(script).toContain("postNavigationIntent(url, 'window.open'");
     expect(script).toContain('return null;');
   });
@@ -19,6 +21,7 @@ describe('createPageGuardScript', () => {
     expect(script).toContain("anchor.relList.contains('external')");
     expect(script).toContain("document.addEventListener('submit'");
     expect(script).toContain('HTMLFormElement.prototype.submit');
+    expect(script).toContain("button[formtarget],input[formtarget]");
   });
 
   it('uses trusted browser events for remote/pointer activation hints', () => {
@@ -28,7 +31,7 @@ describe('createPageGuardScript', () => {
 
   it('observes only bounded DOM changes and iframe/base attributes', () => {
     expect(script).toContain('mutation.addedNodes.forEach(cleanNode)');
-    expect(script).toContain("attributeFilter: ['src', 'target']");
+    expect(script).toContain("attributeFilter: ['src', 'target', 'formtarget']");
     expect(script).not.toContain('setInterval(');
     expect(script).not.toContain('requestAnimationFrame(');
   });

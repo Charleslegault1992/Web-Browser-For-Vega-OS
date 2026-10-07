@@ -102,11 +102,7 @@ export const createPageGuardScript = (): string => {
     }
   }
 
-  function neutralizeFormTarget(form, submitter) {
-    if (form && targetCreatesNewContext(form.getAttribute('target'))) {
-      form.setAttribute('target', '_self');
-    }
-
+  function neutralizeSubmitterTarget(submitter) {
     if (
       submitter &&
       submitter.getAttribute &&
@@ -114,6 +110,14 @@ export const createPageGuardScript = (): string => {
     ) {
       submitter.setAttribute('formtarget', '_self');
     }
+  }
+
+  function neutralizeFormTarget(form, submitter) {
+    if (form && targetCreatesNewContext(form.getAttribute('target'))) {
+      form.setAttribute('target', '_self');
+    }
+
+    neutralizeSubmitterTarget(submitter);
   }
 
   document.addEventListener('pointerdown', markTrustedInteraction, true);
@@ -124,10 +128,34 @@ export const createPageGuardScript = (): string => {
     }
   }, true);
 
-  window.open = function (url) {
+  var guardedWindowOpen = function (url) {
     postNavigationIntent(url, 'window.open', isTrustedGesture());
     return null;
   };
+
+  try {
+    Object.defineProperty(window, 'open', {
+      value: guardedWindowOpen,
+      configurable: false,
+      enumerable: true,
+      writable: false
+    });
+  } catch (_) {
+    window.open = guardedWindowOpen;
+  }
+
+  try {
+    if (typeof Window !== 'undefined' && Window.prototype) {
+      Object.defineProperty(Window.prototype, 'open', {
+        value: guardedWindowOpen,
+        configurable: false,
+        enumerable: true,
+        writable: false
+      });
+    }
+  } catch (_) {
+    // The own window.open guard above is sufficient when the prototype is locked.
+  }
 
   document.addEventListener('click', function (event) {
     markTrustedInteraction(event);
@@ -199,17 +227,33 @@ export const createPageGuardScript = (): string => {
 
     if (node.tagName === 'BASE') {
       neutralizeBaseTarget(node);
+    } else if (node.tagName === 'FORM') {
+      neutralizeFormTarget(node, null);
+    } else if (node.tagName === 'BUTTON' || node.tagName === 'INPUT') {
+      neutralizeSubmitterTarget(node);
     }
 
     if (typeof node.querySelectorAll === 'function') {
       node.querySelectorAll('iframe[src]').forEach(cleanIframe);
       node.querySelectorAll('base[target]').forEach(neutralizeBaseTarget);
+      node.querySelectorAll('form[target]').forEach(function (form) {
+        neutralizeFormTarget(form, null);
+      });
+      node.querySelectorAll('button[formtarget],input[formtarget]').forEach(
+        neutralizeSubmitterTarget
+      );
     }
   }
 
   function cleanInitialDocument() {
     document.querySelectorAll('iframe[src]').forEach(cleanIframe);
     document.querySelectorAll('base[target]').forEach(neutralizeBaseTarget);
+    document.querySelectorAll('form[target]').forEach(function (form) {
+      neutralizeFormTarget(form, null);
+    });
+    document.querySelectorAll('button[formtarget],input[formtarget]').forEach(
+      neutralizeSubmitterTarget
+    );
   }
 
   if (document.readyState === 'loading') {
@@ -233,7 +277,7 @@ export const createPageGuardScript = (): string => {
 
   observer.observe(document.documentElement || document, {
     attributes: true,
-    attributeFilter: ['src', 'target'],
+    attributeFilter: ['src', 'target', 'formtarget'],
     childList: true,
     subtree: true
   });
