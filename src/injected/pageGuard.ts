@@ -62,6 +62,7 @@ export const createPageGuardScript = (): string => {
     window.ReactNativeWebView.postMessage(JSON.stringify({
       type: 'kaylane:navigation-intent',
       url: String(url),
+      openerUrl: window.location.href,
       source: source,
       userInitiated: Boolean(userInitiated)
     }));
@@ -77,7 +78,6 @@ export const createPageGuardScript = (): string => {
     }
   }, true);
 
-  var originalOpen = window.open;
   window.open = function (url) {
     if (url) {
       postNavigationIntent(url, 'window.open', isTrustedGesture());
@@ -98,7 +98,7 @@ export const createPageGuardScript = (): string => {
 
     var opensNewContext =
       anchor.getAttribute('target') === '_blank' ||
-      anchor.hasAttribute('download') === false && anchor.rel === 'external';
+      (anchor.relList && anchor.relList.contains('external'));
 
     if (!opensNewContext) {
       return;
