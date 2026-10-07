@@ -50,17 +50,15 @@ export const App = () => {
         onLoad={handleLoad}
         onError={event => {
           if (__DEV__) {
-            console.warn('Kaylane TV WebView error', event.nativeEvent);
-          }
-        }}
-        onHttpError={event => {
-          if (__DEV__ && event.nativeEvent.isMainFrame) {
-            console.warn('Kaylane TV WebView HTTP error', event.nativeEvent);
+            console.warn(
+              'Kaylane TV WebView load error code',
+              event.nativeEvent.code,
+            );
           }
         }}
         onSslError={(sslError, callback) => {
           if (__DEV__) {
-            console.warn('Kaylane TV WebView SSL error', sslError);
+            console.warn('Kaylane TV WebView SSL error code', sslError.code);
           }
           callback.cancel();
         }}
