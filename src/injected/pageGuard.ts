@@ -1,7 +1,11 @@
-import {BLOCKED_AD_NAVIGATION_HOSTS} from '../navigation/rules';
+import {
+  BLOCKED_AD_NAVIGATION_HOSTS,
+  PRIMARY_HOSTS,
+} from '../navigation/rules';
 
 export const createPageGuardScript = (): string => {
   const blockedHosts = JSON.stringify(BLOCKED_AD_NAVIGATION_HOSTS);
+  const primaryHosts = JSON.stringify(PRIMARY_HOSTS);
 
   return `
 (function () {
@@ -10,13 +14,14 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 5 }),
+    value: Object.freeze({ version: 6 }),
     configurable: false,
     enumerable: false,
     writable: false
   });
 
   var BLOCKED_HOSTS = ${blockedHosts};
+  var PRIMARY_HOSTS = ${primaryHosts};
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -34,6 +39,12 @@ export const createPageGuardScript = (): string => {
     );
   }
 
+  function matchesAnyHost(host, rules) {
+    return rules.some(function (rule) {
+      return hostMatchesRule(host, rule);
+    });
+  }
+
   function parseHttpsDestination(url) {
     try {
       var parsed = new URL(url, document.baseURI);
@@ -45,13 +56,13 @@ export const createPageGuardScript = (): string => {
 
   function isBlockedHost(url) {
     var parsed = parseHttpsDestination(url);
-    if (!parsed) {
-      return false;
-    }
+    return Boolean(
+      parsed && matchesAnyHost(parsed.hostname, BLOCKED_HOSTS)
+    );
+  }
 
-    return BLOCKED_HOSTS.some(function (rule) {
-      return hostMatchesRule(parsed.hostname, rule);
-    });
+  function isPrimaryHost(host) {
+    return matchesAnyHost(host, PRIMARY_HOSTS);
   }
 
   function targetCreatesNewContext(target) {
@@ -94,7 +105,20 @@ export const createPageGuardScript = (): string => {
     );
   }
 
-  function consumeNewContextEvent(event) {
+  function isUnwantedPrimaryPageEscape(url) {
+    if (!isPrimaryHost(window.location.hostname)) {
+      return false;
+    }
+
+    var destination = parseHttpsDestination(url);
+    if (!destination) {
+      return false;
+    }
+
+    return !isPrimaryHost(destination.hostname);
+  }
+
+  function consumeNavigationEvent(event) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -103,12 +127,69 @@ export const createPageGuardScript = (): string => {
     }
   }
 
-  // Vega is intentionally single-window. A website may use window.open as an
-  // advertising side effect of Play. Ignore it completely but return a truthy
-  // Window object so basic popup-blocker feature detection does not break the
-  // page's inline action.
+  function createPopupLocationStub() {
+    var hrefValue = 'about:blank';
+
+    return {
+      get href() {
+        return hrefValue;
+      },
+      set href(value) {
+        hrefValue = String(value || '');
+      },
+      assign: function (value) {
+        hrefValue = String(value || '');
+      },
+      replace: function (value) {
+        hrefValue = String(value || '');
+      },
+      reload: function () {},
+      toString: function () {
+        return hrefValue;
+      }
+    };
+  }
+
+  function createPopupDocumentStub() {
+    return {
+      open: function () {
+        return this;
+      },
+      close: function () {},
+      write: function () {},
+      writeln: function () {},
+      body: null
+    };
+  }
+
+  function createPopupStub() {
+    var stub = {
+      closed: false,
+      opener: window,
+      location: createPopupLocationStub(),
+      document: createPopupDocumentStub(),
+      focus: function () {},
+      blur: function () {},
+      postMessage: function () {},
+      close: function () {
+        stub.closed = true;
+      }
+    };
+
+    stub.self = stub;
+    stub.window = stub;
+    stub.parent = stub;
+    stub.top = stub;
+
+    return stub;
+  }
+
+  // Never expose the real current window as the return value of window.open.
+  // Some ad scripts assign popup.location after the call; returning window
+  // would redirect Kaylane TV's only WebView. A truthy isolated stub satisfies
+  // common popup checks while keeping all popup-side navigation inert.
   var guardedWindowOpen = function () {
-    return window;
+    return createPopupStub();
   };
 
   try {
@@ -131,12 +212,11 @@ export const createPageGuardScript = (): string => {
         writable: false
       });
     }
-  } catch (_) {
-    // The own window.open guard above is sufficient when the prototype is locked.
-  }
+  } catch (_) {}
 
-  // Explicit new-tab/new-window anchors are ignored. Standard same-window
-  // anchors are untouched and continue to navigate normally.
+  // On Movix/Dofuz, the top page should stay on the selected service.
+  // Unknown third-party player/media frames are not touched because this test
+  // runs against each frame's own location.
   document.addEventListener('click', function (event) {
     var target = event.target;
     if (!target || typeof target.closest !== 'function') {
@@ -144,21 +224,36 @@ export const createPageGuardScript = (): string => {
     }
 
     var anchor = target.closest('a[href]');
-    if (!anchor || !anchorCreatesNewContext(anchor)) {
+    if (!anchor) {
       return;
     }
 
-    consumeNewContextEvent(event);
+    var href = anchor.href || anchor.getAttribute('href') || '';
+
+    if (
+      anchorCreatesNewContext(anchor) ||
+      isBlockedHost(href) ||
+      isUnwantedPrimaryPageEscape(href)
+    ) {
+      consumeNavigationEvent(event);
+    }
   }, true);
 
-  // Forms that explicitly request another browsing context are ignored too.
-  // Same-window forms continue through the browser untouched.
   document.addEventListener('submit', function (event) {
-    if (!submitCreatesNewContext(event.target, event.submitter || null)) {
-      return;
-    }
+    var form = event.target;
+    var submitter = event.submitter || null;
+    var action =
+      form && form.action
+        ? form.action
+        : window.location.href;
 
-    consumeNewContextEvent(event);
+    if (
+      submitCreatesNewContext(form, submitter) ||
+      isBlockedHost(action) ||
+      isUnwantedPrimaryPageEscape(action)
+    ) {
+      consumeNavigationEvent(event);
+    }
   }, true);
 
   if (
@@ -169,7 +264,13 @@ export const createPageGuardScript = (): string => {
     var nativeFormSubmit = HTMLFormElement.prototype.submit;
 
     HTMLFormElement.prototype.submit = function () {
-      if (submitCreatesNewContext(this, null)) {
+      var action = this.action || window.location.href;
+
+      if (
+        submitCreatesNewContext(this, null) ||
+        isBlockedHost(action) ||
+        isUnwantedPrimaryPageEscape(action)
+      ) {
         return undefined;
       }
 
