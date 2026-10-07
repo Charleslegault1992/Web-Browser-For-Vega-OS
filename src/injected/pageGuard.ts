@@ -118,13 +118,13 @@ export const createPageGuardScript = (): string => {
     return !isPrimaryHost(destination.hostname);
   }
 
-  function consumeNavigationEvent(event) {
+  function preventNavigationDefault(event) {
+    // Keep the site's click/submit handlers alive. Many players attach their
+    // real inline-player bootstrap to the same element that also carries a
+    // fallback external href/target. Stopping propagation broke that flow.
+    // Prevent only the browser's default navigation; window.open remains
+    // isolated and scripted top-level escapes are covered separately.
     event.preventDefault();
-    event.stopPropagation();
-
-    if (typeof event.stopImmediatePropagation === 'function') {
-      event.stopImmediatePropagation();
-    }
   }
 
   function createPopupLocationStub() {
@@ -235,7 +235,7 @@ export const createPageGuardScript = (): string => {
       isBlockedHost(href) ||
       isUnwantedPrimaryPageEscape(href)
     ) {
-      consumeNavigationEvent(event);
+      preventNavigationDefault(event);
     }
   }, true);
 
@@ -275,7 +275,7 @@ export const createPageGuardScript = (): string => {
       isBlockedHost(action) ||
       isUnwantedPrimaryPageEscape(action)
     ) {
-      consumeNavigationEvent(event);
+      preventNavigationDefault(event);
     }
   }, true);
 
