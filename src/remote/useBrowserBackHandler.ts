@@ -67,8 +67,6 @@ export const useBrowserBackHandler = (
           case 'go-home':
             current.goHome();
             return true;
-          case 'system-default':
-            return false;
         }
       },
     );
