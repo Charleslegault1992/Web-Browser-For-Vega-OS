@@ -239,6 +239,29 @@ export const createPageGuardScript = (): string => {
     }
   }, true);
 
+  if (
+    window.navigation &&
+    typeof window.navigation.addEventListener === 'function'
+  ) {
+    window.navigation.addEventListener('navigate', function (event) {
+      var destinationUrl =
+        event &&
+        event.destination &&
+        event.destination.url
+          ? event.destination.url
+          : '';
+
+      if (
+        destinationUrl &&
+        (isBlockedHost(destinationUrl) ||
+          isUnwantedPrimaryPageEscape(destinationUrl)) &&
+        event.cancelable
+      ) {
+        event.preventDefault();
+      }
+    });
+  }
+
   document.addEventListener('submit', function (event) {
     var form = event.target;
     var submitter = event.submitter || null;
