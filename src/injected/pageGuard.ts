@@ -418,10 +418,7 @@ export const createPageGuardScript = (): string => {
         return true;
       }
 
-      if (
-        current.querySelectorAll &&
-        !modalSemanticSignal(current)
-      ) {
+      if (current.querySelectorAll) {
         var interactiveCount = current.querySelectorAll(
           'button,a[href],[role="button"],input[type="radio"]'
         ).length;
@@ -429,7 +426,9 @@ export const createPageGuardScript = (): string => {
         if (
           interactiveCount >= 2 &&
           interactiveCount <= 24 &&
-          elementCoverage(current) <= 0.55
+          elementCoverage(current) <= 0.55 &&
+          !nodeHasBlockedHost(current) &&
+          !nodeHasExternalEscape(current)
         ) {
           return true;
         }
