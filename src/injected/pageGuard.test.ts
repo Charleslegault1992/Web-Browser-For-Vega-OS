@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 13');
+    expect(script).toContain('version: 14');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -99,6 +99,16 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('window.confirm = function ()');
     expect(script).toContain('window.prompt = function ()');
     expect(script).toContain('function installNonPrimaryModalCssShield()');
+  });
+
+  it('exposes manual popup cleanup APIs for remote recovery', () => {
+    expect(script).toContain('function closePopupAt(clientX, clientY)');
+    expect(script).toContain('function closeAllPopups()');
+    expect(script).toContain('function isManualPopupCandidate(node)');
+    expect(script).toContain('closePopupAt: closePopupAt');
+    expect(script).toContain('closeAllPopups: closeAllPopups');
+    expect(script).toContain('isSourceSelectionSurface(node)');
+    expect(script).toContain('containsLargePlayerFrame(node)');
   });
 
   it('keeps playback cleanup bounded and batches DOM mutations', () => {
