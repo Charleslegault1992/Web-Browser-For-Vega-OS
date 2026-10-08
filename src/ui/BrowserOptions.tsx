@@ -35,7 +35,6 @@ const OptionButton = ({
 type Props = {
   currentPointerMode: 'pointer' | 'focus';
   onTogglePointerMode: () => void;
-  onInteractionMode: () => void;
   onRetryPlayer: () => void;
   onReloadPage: () => void;
   onHome: () => void;
@@ -45,7 +44,6 @@ type Props = {
 export const BrowserOptions = ({
   currentPointerMode,
   onTogglePointerMode,
-  onInteractionMode,
   onRetryPlayer,
   onReloadPage,
   onHome,
@@ -84,11 +82,6 @@ export const BrowserOptions = ({
           onPress={onTogglePointerMode}
         />
         <OptionButton
-          label="Interaction lecteur / vérification"
-          description="Donne le contrôle natif au lecteur ou au module de vérification pour utiliser OK."
-          onPress={onInteractionMode}
-        />
-        <OptionButton
           label="Relancer le lecteur"
           description="Réessaie la vidéo ou recharge le lecteur intégré sans quitter la page."
           onPress={onRetryPlayer}
@@ -112,7 +105,7 @@ export const BrowserOptions = ({
 
       <View style={styles.tip}>
         <Text style={styles.tipText}>
-          Astuce : dans une vidéo, maintiens OK pour basculer entre pointeur et sélection.
+          Astuce : utilise la première option du menu pour basculer entre pointeur et sélection.
         </Text>
       </View>
     </View>
