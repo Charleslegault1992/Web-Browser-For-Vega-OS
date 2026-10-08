@@ -93,6 +93,8 @@ expect(appSource.includes('allowsDefaultMediaControl={true}'), 'Default WebView 
 expect(appSource.includes('thirdPartyCookiesEnabled={true}'), 'Third-party cookies must remain enabled for embedded-player compatibility.');
 expect(appSource.includes('mediaPlaybackRequiresUserAction={false}'), 'HTML5 media compatibility mode must allow playback without an additional WebView gesture gate.');
 expect(appSource.includes('createPlayerCompatibilityScript'), 'Player compatibility bootstrap must remain installed.');
+expect(appSource.includes('FocusManager.focus'), 'Pointer mode must move native TV focus away from WebView/player controls.');
+expect(appSource.includes('pointerInputCapture'), 'Pointer mode must keep a native focus-capture layer over the WebView.');
 expect(playerCompatSource.includes('disableRemotePlayback = true'), 'Player compatibility must disable unsupported remote playback surfaces.');
 expect(!playerCompatSource.includes('setInterval('), 'Player compatibility must not use permanent polling.');
 expect(appSource.includes('callback.cancel();'), 'SSL error handler must explicitly fail closed.');
@@ -104,3 +106,14 @@ expect(png.subarray(0, 8).equals(pngSignature), 'App icon must be a PNG.');
 expect(png.readUInt32BE(16) === 512 && png.readUInt32BE(20) === 512, 'App icon must be exactly 512x512.');
 
 console.log('Static Vega/native validation passed.');
+
+expect(
+  read('src/ui/BrowserHome.tsx').includes(
+    'https://dofuz.com/xoitsomxvna96/home/dofuz',
+  ),
+  'Dofuz home card must use the validated direct route.',
+);
+expect(
+  read('src/ui/BrowserHome.tsx').includes('KAYLANE_SLIDES'),
+  'Kaylane home must use individual slideshow photos instead of the broken collage.',
+);
