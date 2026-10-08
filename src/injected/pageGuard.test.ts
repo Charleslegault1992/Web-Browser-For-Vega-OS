@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 15');
+    expect(script).toContain('version: 16');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -122,6 +122,23 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('ratio <= 2.40');
     expect(script).toContain('coverage >= 0.16');
     expect(script).toContain('!isLikelyPlayerFrame(frame) && frameOverlayEvidence(frame)');
+  });
+
+  it('detects opaque visual layers stacked above a real player', () => {
+    expect(script).toContain('function layerStackAt(clientX, clientY)');
+    expect(script).toContain('document.elementsFromPoint');
+    expect(script).toContain('function playerLayerBelow(stack, startIndex)');
+    expect(script).toContain('function visualObstructionAt(clientX, clientY)');
+    expect(script).toContain('function frameCoversUnderlyingPlayer(frame)');
+    expect(script).toContain('function removeVisualObstructionAt(clientX, clientY)');
+    expect(script).toContain('function sweepVisualObstructions()');
+    expect(script).toContain('dismissVisualObstructionAt: removeVisualObstructionAt');
+  });
+
+  it('uses visual obstruction evidence in both recurring iframe cleanup and close-all', () => {
+    expect(script).toContain('frameCoversUnderlyingPlayer(frame) ||');
+    expect(script).toContain('removed += sweepVisualObstructions()');
+    expect(script).toContain('popupPurgeUntil');
   });
 
   it('keeps playback cleanup bounded and batches DOM mutations', () => {
