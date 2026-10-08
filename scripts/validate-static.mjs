@@ -187,6 +187,21 @@ expect(
   'Manual popup cleanup must preserve video-shaped player iframes.',
 );
 expect(
+  pageGuardSource.includes('function layerStackAt(clientX, clientY)') &&
+    pageGuardSource.includes('document.elementsFromPoint') &&
+    pageGuardSource.includes('function visualObstructionAt(clientX, clientY)') &&
+    pageGuardSource.includes('function frameCoversUnderlyingPlayer(frame)') &&
+    pageGuardSource.includes('function removeVisualObstructionAt(clientX, clientY)') &&
+    pageGuardSource.includes('function sweepVisualObstructions()'),
+  'Popup cleanup must detect visual layers stacked above the real player.',
+);
+expect(
+  pageGuardSource.includes('dismissVisualObstructionAt: removeVisualObstructionAt') &&
+    pageGuardSource.includes('removed += sweepVisualObstructions()') &&
+    pageGuardSource.includes('frameCoversUnderlyingPlayer(frame) ||'),
+  'Visual obstruction cleanup must be exposed to pointer OK, close-all, and recurring iframe cleanup.',
+);
+expect(
   appSource.includes('kaylane-popup-cleanup') &&
     appSource.includes('closeAllPopups'),
   'App menu cleanup must invoke the page popup cleaner and report completion.',
@@ -311,11 +326,12 @@ expect(
   'Pointer OK may promote only a topmost iframe, never an iframe hidden under another control.',
 );
 expect(
-  remotePointerSource.includes('function isNearTopRightOfFrame(frame)') &&
-    remotePointerSource.includes('function dismissTopmostPopupFrame(frame)') &&
-    remotePointerSource.includes('__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt') &&
-    remotePointerSource.includes('isNearTopRightOfFrame(hit)'),
-  'Pointer OK on an iframe close corner must dismiss/quarantine the popup instead of isolating it.',
+  remotePointerSource.includes('function dismissVisualObstructionAtPointer()') &&
+    remotePointerSource.includes('__KAYLANE_TV_GUARD_API__.dismissVisualObstructionAt') &&
+    remotePointerSource.includes('if (dismissVisualObstructionAtPointer())') &&
+    remotePointerSource.includes('function isNearTopRightOfFrame(frame)') &&
+    remotePointerSource.includes('function dismissTopmostPopupFrame(frame)'),
+  'Pointer OK must remove a visual layer above the real player before any iframe promotion.',
 );
 expect(
   remotePointerSource.includes('function deepElementAtPointer()') &&
