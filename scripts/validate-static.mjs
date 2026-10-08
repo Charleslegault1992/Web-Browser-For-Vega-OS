@@ -17,6 +17,8 @@ const manifest = read('manifest.toml');
 const config = read('src/config.ts');
 const appSource = read('src/App.tsx');
 const playerCompatSource = read('src/injected/playerCompat.ts');
+const pointerModeSource = read('src/remote/useWebPointerMode.ts');
+const homeSource = read('src/ui/BrowserHome.tsx');
 
 const expected = {
   packageId: 'com.kaylanetv.browser',
@@ -95,6 +97,13 @@ expect(appSource.includes('mediaPlaybackRequiresUserAction={false}'), 'HTML5 med
 expect(appSource.includes('createPlayerCompatibilityScript'), 'Player compatibility bootstrap must remain installed.');
 expect(appSource.includes('FocusManager.focus'), 'Pointer mode must move native TV focus away from WebView/player controls.');
 expect(appSource.includes('pointerInputCapture'), 'Pointer mode must keep a native focus-capture layer over the WebView.');
+expect(appSource.includes('<Pressable'), 'Pointer focus capture must be a native Pressable so OK works on Vega TV.');
+expect(appSource.includes('delayLongPress={700}'), 'Pointer Pressable must preserve the 700 ms long-OK mode switch.');
+expect(appSource.includes('activatePointer()'), 'Short OK on the pointer capture must activate the DOM pointer target.');
+expect(
+  !pointerModeSource.includes('addUserInputListenerCallback(\n        UserInputEventName.Select'),
+  'Pointer mode must not override Select through UserInputManager because that suppresses native Pressable OK handling.',
+);
 expect(playerCompatSource.includes('disableRemotePlayback = true'), 'Player compatibility must disable unsupported remote playback surfaces.');
 expect(!playerCompatSource.includes('setInterval('), 'Player compatibility must not use permanent polling.');
 expect(appSource.includes('callback.cancel();'), 'SSL error handler must explicitly fail closed.');
@@ -106,14 +115,19 @@ expect(png.subarray(0, 8).equals(pngSignature), 'App icon must be a PNG.');
 expect(png.readUInt32BE(16) === 512 && png.readUInt32BE(20) === 512, 'App icon must be exactly 512x512.');
 
 expect(
-  read('src/ui/BrowserHome.tsx').includes(
+  homeSource.includes(
     'https://dofuz.com/xoitsomxvna96/home/dofuz',
   ),
   'Dofuz home card must use the validated direct route.',
 );
 expect(
-  read('src/ui/BrowserHome.tsx').includes('KAYLANE_SLIDES'),
+  homeSource.includes('KAYLANE_SLIDES'),
   'Kaylane home must use individual slideshow photos instead of the broken collage.',
+);
+expect(homeSource.includes('#TEAMDEFEUX'), 'Kaylane home must show #TEAMDEFEUX.');
+expect(
+  homeSource.includes('Je suis fucking fier de toi.'),
+  'Kaylane home must show the requested pride message.',
 );
 
 console.log('Static Vega/native validation passed.');
