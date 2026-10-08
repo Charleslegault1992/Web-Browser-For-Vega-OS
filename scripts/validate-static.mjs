@@ -214,9 +214,19 @@ expect(
 );
 expect(
   pageGuardSource.includes('function isVerificationSurface(node)') &&
-    pageGuardSource.includes("'turnstile'") &&
-    pageGuardSource.includes("'captcha'"),
-  'Playback modal shield must preserve human-verification surfaces.',
+    pageGuardSource.includes('function isTrustedVerificationUrl(url)') &&
+    pageGuardSource.includes("'challenges.cloudflare.com'") &&
+    pageGuardSource.includes("'www.recaptcha.net'") &&
+    pageGuardSource.includes("'hcaptcha.com'") &&
+    pageGuardSource.includes("'cf-turnstile'"),
+  'Playback modal shield must preserve trusted human-verification providers.',
+);
+expect(
+  pageGuardSource.includes('function looksLikeFakeVerificationAd(node)') &&
+    pageGuardSource.includes("text.indexOf('scan the qr')") &&
+    pageGuardSource.includes("text.indexOf('not a robot')") &&
+    pageGuardSource.includes("text.indexOf('your phone')"),
+  'Fake QR robot-check ads must not be mistaken for trusted verification.',
 );
 expect(
   pageGuardSource.includes('window.alert = function ()') &&
@@ -241,6 +251,20 @@ expect(
   remotePointerSource.includes('var MAX_SPEED = 650') &&
     remotePointerSource.includes('var FRICTION = 18'),
   'Pointer must keep the reduced top speed and stronger stopping friction.',
+);
+expect(
+  remotePointerSource.includes(
+    'Do not auto-promote any iframe found underneath it',
+  ) &&
+    !remotePointerSource.includes(
+      'var embeddedFrame = embeddedPlayerAtPointer();',
+    ),
+  'Pointer OK must activate the topmost control instead of auto-isolating an iframe underneath it.',
+);
+expect(
+  remotePointerSource.includes('function promoteLargestEmbeddedPlayer()') &&
+    remotePointerSource.includes('armPlaybackShield();'),
+  'Player isolation must remain available explicitly through the menu/API.',
 );
 expect(playerCompatSource.includes('disableRemotePlayback = true'), 'Player compatibility must disable unsupported remote playback surfaces.');
 expect(!playerCompatSource.includes('setInterval('), 'Player compatibility must not use permanent polling.');
