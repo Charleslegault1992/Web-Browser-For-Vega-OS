@@ -239,10 +239,12 @@ expect(
   'Deep playback scans must stay disabled while primary pages bootstrap.',
 );
 expect(
-  pageGuardSource.includes('window.alert = function ()') &&
+  pageGuardSource.includes('function installNonPrimaryModalCssShield()') &&
+    pageGuardSource.includes('data-kaylane-no-modal-css') &&
+    pageGuardSource.includes('window.alert = function ()') &&
     pageGuardSource.includes('window.confirm = function ()') &&
     pageGuardSource.includes('window.prompt = function ()'),
-  'Playback shield must suppress blocking browser dialogs during player interaction.',
+  'Modal CSS and blocking browser dialogs must stay disabled globally.',
 );
 expect(
   pageGuardSource.includes("'aria-modal'") &&
