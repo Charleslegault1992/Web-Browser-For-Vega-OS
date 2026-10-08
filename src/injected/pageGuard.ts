@@ -445,14 +445,9 @@ export const createPageGuardScript = (): string => {
       node.nodeType !== 1 ||
       node === document.body ||
       node === document.documentElement ||
-      touchesFullscreenTree(node) ||
-      isSourceSelectionSurface(node)
+      touchesFullscreenTree(node)
     ) {
       return false;
-    }
-
-    if (looksLikeVerificationModal(node)) {
-      return true;
     }
 
     var style;
@@ -465,21 +460,99 @@ export const createPageGuardScript = (): string => {
 
     var position = String(style.position || '').toLowerCase();
     var coverage = elementCoverage(node);
+    var overlayPosition =
+      position === 'fixed' ||
+      position === 'sticky' ||
+      position === 'absolute';
+    var verificationSignal = looksLikeVerificationModal(node);
+    var modalSignal = modalSemanticSignal(node);
+    var closeSignal = hasCloseControl(node);
 
     if (
-      coverage < 0.01 ||
-      coverage > 0.80 ||
-      (position !== 'fixed' &&
-        position !== 'sticky' &&
-        position !== 'absolute')
+      !verificationSignal &&
+      !modalSignal &&
+      !(overlayPosition && closeSignal)
     ) {
       return false;
     }
 
-    return (
-      hasCloseControl(node) &&
-      (nodeHasBlockedHost(node) || nodeHasExternalEscape(node))
-    );
+    if (
+      coverage < 0.005 ||
+      coverage > 0.92
+    ) {
+      return false;
+    }
+
+    // Source/server selection is legitimate application UI even when a site
+    // implements it with modal-like markup. Preserve it before applying the
+    // global no-modal policy.
+    if (isSourceSelectionSurface(node)) {
+      return false;
+    }
+
+    // Product requirement: no modal overlays at all. This intentionally also
+    // removes robot/human verification modals instead of trying to complete or
+    // bypass them; the user can choose another source.
+    if (verificationSignal || modalSignal) {
+      return true;
+    }
+
+    return overlayPosition && closeSignal;
+  }
+
+  function sweepAlwaysBlockedModals(root) {
+    if (!root || root.nodeType !== 1) {
+      return 0;
+    }
+
+    var removed = 0;
+
+    if (removeObviousStandaloneAdModal(root)) {
+      return 1;
+    }
+
+    if (!root.querySelectorAll) {
+      return 0;
+    }
+
+    var candidates;
+
+    try {
+      candidates = root.querySelectorAll(
+        [
+          'dialog',
+          '[role="dialog"]',
+          '[role="alertdialog"]',
+          '[aria-modal="true"]',
+          '[class*="modal"]',
+          '[id*="modal"]',
+          '[class*="popup"]',
+          '[id*="popup"]',
+          '[class*="interstitial"]',
+          '[id*="interstitial"]',
+          '[class*="overlay"]',
+          '[id*="overlay"]',
+          'button',
+          '[role="button"]',
+          '[aria-label]'
+        ].join(',')
+      );
+    } catch (_) {
+      return 0;
+    }
+
+    for (
+      var index = 0;
+      index < candidates.length &&
+      index < MAX_ALWAYS_MODAL_SCAN;
+      index += 1
+    ) {
+      if (removeObviousStandaloneAdModal(candidates[index])) {
+        removed += 1;
+      }
+    }
+
+    return removed;
   }
 
   function removeObviousStandaloneAdModal(node) {
@@ -1278,7 +1351,18 @@ export const createPageGuardScript = (): string => {
       return;
     }
 
-    if (removeObviousStandaloneAdModal(node)) {
+    if (sweepAlwaysBlockedModals(node) > 0) {
+      return;
+    }
+
+    if (node.tagName === 'IFRAME' && cleanIframe(node)) {
+      return;
+    }
+
+    // Keep primary pages light while they bootstrap. The previous guard did
+    // deep subtree scans on every mutation and could starve Dofuz's SPA render,
+    // leaving the three-dot loader on screen.
+    if (!isPlaybackShieldActive()) {
       return;
     }
 
@@ -1294,29 +1378,33 @@ export const createPageGuardScript = (): string => {
       return;
     }
 
-    if (node.tagName === 'IFRAME' && cleanIframe(node)) {
-      return;
-    }
-
     if (typeof node.querySelectorAll === 'function') {
       sweepPlaybackModals(node);
-      node.querySelectorAll('iframe[src]').forEach(cleanIframe);
 
-      node.querySelectorAll('a[href],iframe[src]').forEach(function (candidate) {
-        removeLikelyAdOverlay(candidate);
-      });
+      var frames = node.querySelectorAll('iframe[src]');
+      for (
+        var frameIndex = 0;
+        frameIndex < frames.length && frameIndex < 12;
+        frameIndex += 1
+      ) {
+        cleanIframe(frames[frameIndex]);
+      }
     }
   }
 
   function cleanInitialDocument() {
-    document.querySelectorAll(
-      'div,section,aside,dialog,[role="dialog"],[aria-modal="true"]'
-    ).forEach(removeObviousStandaloneAdModal);
-    sweepPlaybackModals(document);
-    document.querySelectorAll('iframe[src]').forEach(cleanIframe);
-    document.querySelectorAll('a[href],iframe[src]').forEach(function (candidate) {
-      removeLikelyAdOverlay(candidate);
-    });
+    if (document.documentElement) {
+      sweepAlwaysBlockedModals(document.documentElement);
+    }
+
+    var frames = document.querySelectorAll('iframe[src]');
+    for (
+      var index = 0;
+      index < frames.length && index < 16;
+      index += 1
+    ) {
+      cleanIframe(frames[index]);
+    }
   }
 
   if (document.readyState === 'loading') {
@@ -1327,16 +1415,41 @@ export const createPageGuardScript = (): string => {
     cleanInitialDocument();
   }
 
+  function flushMutationQueue() {
+    mutationFrame = 0;
+
+    var nodes = Array.from(mutationQueue);
+    mutationQueue.clear();
+
+    for (var index = 0; index < nodes.length; index += 1) {
+      cleanNode(nodes[index], true);
+    }
+  }
+
+  function queueMutationNode(node) {
+    if (
+      !node ||
+      node.nodeType !== 1 ||
+      mutationQueue.size >= MAX_MUTATION_QUEUE
+    ) {
+      return;
+    }
+
+    mutationQueue.add(node);
+
+    if (!mutationFrame) {
+      mutationFrame = window.requestAnimationFrame(flushMutationQueue);
+    }
+  }
+
   var observer = new MutationObserver(function (mutations) {
     mutations.forEach(function (mutation) {
       if (mutation.type === 'attributes') {
-        cleanNode(mutation.target, true);
+        queueMutationNode(mutation.target);
         return;
       }
 
-      mutation.addedNodes.forEach(function (node) {
-        cleanNode(node, true);
-      });
+      mutation.addedNodes.forEach(queueMutationNode);
     });
   });
 
