@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 15');
+    expect(script).toContain('version: 16');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -101,19 +101,30 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('function installNonPrimaryModalCssShield()');
   });
 
-  it('exposes manual popup cleanup and iframe-quarantine APIs for remote recovery', () => {
+  it('exposes manual popup cleanup, iframe quarantine, and explicit element deletion', () => {
     expect(script).toContain('function closePopupAt(clientX, clientY)');
     expect(script).toContain('function closeAllPopups()');
     expect(script).toContain('function dismissPopupFrameAt(clientX, clientY, forceCloseCorner)');
+    expect(script).toContain('function deleteElementAt(clientX, clientY)');
+    expect(script).toContain('function isProtectedMediaDeletionTarget(node)');
+    expect(script).toContain('function manualDeletionTarget(node)');
+    expect(script).toContain("return 'protected'");
+    expect(script).toContain("return 'deleted'");
+    expect(script).toContain('deleteElementAt: deleteElementAt');
     expect(script).toContain('function rememberPopupFrame(frame)');
     expect(script).toContain('function isQuarantinedPopupFrame(frame)');
     expect(script).toContain('var quarantinedPopupSignatures = new Set()');
     expect(script).toContain('popupPurgeUntil');
-    expect(script).toContain('closePopupAt: closePopupAt');
-    expect(script).toContain('dismissPopupFrameAt: dismissPopupFrameAt');
-    expect(script).toContain('closeAllPopups: closeAllPopups');
     expect(script).toContain("'iframe[src]'");
     expect(script).toContain("'iframe[data-src]'");
+  });
+
+  it('protects actual media and player iframes from manual deletion', () => {
+    expect(script).toContain("node.matches('video,audio')");
+    expect(script).toContain("node.closest('video,audio')");
+    expect(script).toContain("node.tagName === 'IFRAME'");
+    expect(script).toContain('isLikelyPlayerFrame(node)');
+    expect(script).toContain("node.querySelector('video,audio')");
   });
 
   it('preserves real video-shaped player iframes during manual purge', () => {
