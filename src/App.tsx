@@ -248,6 +248,13 @@ export const App = () => {
     [clearSoftRetryTimer, syncWebPointerMode, updateCanGoBack],
   );
 
+  const remountCurrentPage = useCallback(() => {
+    const currentUrl = mainFrameUrlRef.current || sourceUrl;
+
+    setSourceUrl(currentUrl);
+    setWebViewGeneration(previous => previous + 1);
+  }, [sourceUrl]);
+
   const scheduleSoftReload = useCallback((): boolean => {
     if (softRetryCountRef.current >= MAX_SOFT_RETRIES) {
       return false;
@@ -258,11 +265,11 @@ export const App = () => {
 
     softRetryTimeoutRef.current = setTimeout(() => {
       softRetryTimeoutRef.current = null;
-      webViewRef.current?.reload();
+      remountCurrentPage();
     }, SOFT_RETRY_DELAY_MS);
 
     return true;
-  }, [clearSoftRetryTimer]);
+  }, [clearSoftRetryTimer, remountCurrentPage]);
 
   const handleSoftWebViewError = useCallback(
     (event: WebViewErrorEvent) => {
@@ -356,8 +363,8 @@ export const App = () => {
     softRetryCountRef.current = 0;
     setFatalError(null);
     setLoading(true);
-    webViewRef.current?.reload();
-  }, [clearSoftRetryTimer]);
+    remountCurrentPage();
+  }, [clearSoftRetryTimer, remountCurrentPage]);
 
   if (surface === 'home') {
     return (
