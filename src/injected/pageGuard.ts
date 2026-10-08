@@ -893,8 +893,8 @@ export const createPageGuardScript = (): string => {
       current !== document.documentElement &&
       depth < 7
     ) {
-      if (isProtectedMediaDeletionTarget(current)) {
-        return null;
+      if (current !== node && isProtectedMediaDeletionTarget(current)) {
+        break;
       }
 
       try {
