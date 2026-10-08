@@ -3,12 +3,13 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and exposes the v8 pointer API', () => {
+  it('is idempotent and exposes the v9 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
-    expect(script).toContain('version: 8');
+    expect(script).toContain('version: 9');
     expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
     expect(script).toContain('setMode: setMode');
     expect(script).toContain('setDirection: setDirection');
+    expect(script).toContain('setDeleteMode: setDeleteMode');
     expect(script).toContain('activate: activate');
   });
 
@@ -65,22 +66,26 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain('target.click()');
   });
 
-  it('uses direct media playback and popup-close fallbacks for OK', () => {
+  it('keeps normal OK as activation only and deletion strictly opt-in', () => {
     expect(script).toContain('function toggleMedia(target)');
     expect(script).toContain('var result = media.play()');
     expect(script).toContain('media.pause()');
-    expect(script).toContain('function isCloseTarget(target)');
-    expect(script).toContain('function closePopupAtPointer()');
-    expect(script).toContain('__KAYLANE_TV_GUARD_API__.closePopupAt');
+    expect(script).toContain('var deleteMode = false');
+    expect(script).toContain('function setDeleteMode(enabled, shouldAnnounce)');
+    expect(script).toContain('function deleteElementAtPointer()');
+    expect(script).toContain('__KAYLANE_TV_GUARD_API__.deleteElementAt');
+    expect(script).toContain("if (deleteMode)");
+    expect(script).toContain('Normal pointer mode never deletes DOM elements');
+    expect(script).not.toContain('function closePopupAtPointer()');
+    expect(script).not.toContain('function dismissTopmostPopupFrame(frame)');
+    expect(script).not.toContain('function isNearTopRightOfFrame(frame)');
   });
 
-  it('dismisses a popup iframe close-corner before considering player promotion', () => {
-    expect(script).toContain('function isNearTopRightOfFrame(frame)');
-    expect(script).toContain('function dismissTopmostPopupFrame(frame)');
-    expect(script).toContain('__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt');
-    expect(script).toContain('isNearTopRightOfFrame(hit)');
-    expect(script).toContain('dismissTopmostPopupFrame(hit)');
-    expect(script).toContain('promoteFrame(hit)');
+  it('shows a distinct red cursor when delete mode is enabled', () => {
+    expect(script).toContain("cursor.style.borderColor = deleteMode ? '#ff4d5e' : '#ffffff'");
+    expect(script).toContain("'Supprimer élément : ON'");
+    expect(script).toContain("'Supprimer élément : OFF'");
+    expect(script).toContain("'Vidéo protégée'");
   });
 
   it('promotes an iframe only when that iframe is the topmost hit target', () => {
