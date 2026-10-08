@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
 
-type OptionTone = 'default' | 'accent' | 'cleaner';
+type OptionTone = 'default' | 'accent' | 'cleaner' | 'danger';
 
 type OptionButtonProps = {
   label: string;
@@ -34,6 +34,7 @@ const OptionButton = ({
         styles.option,
         tone === 'accent' && styles.optionAccent,
         tone === 'cleaner' && styles.optionCleaner,
+        tone === 'danger' && styles.optionDanger,
         focused && styles.optionFocused,
       ]}>
       <Text style={styles.optionTitle}>{label}</Text>
@@ -46,7 +47,9 @@ const OptionButton = ({
 
 type Props = {
   currentPointerMode: 'pointer' | 'focus';
+  elementDeleteMode: boolean;
   onTogglePointerMode: () => void;
+  onToggleElementDeleteMode: () => void;
   onOpenEmbeddedPlayer: () => void;
   onClosePopups: () => void;
   onRetryPlayer: () => void;
@@ -57,7 +60,9 @@ type Props = {
 
 export const BrowserOptions = ({
   currentPointerMode,
+  elementDeleteMode,
   onTogglePointerMode,
+  onToggleElementDeleteMode,
   onOpenEmbeddedPlayer,
   onClosePopups,
   onRetryPlayer,
@@ -76,11 +81,19 @@ export const BrowserOptions = ({
           </Text>
         </View>
 
-        <View style={styles.modeBadge}>
-          <Text style={styles.modeBadgeLabel}>MODE</Text>
-          <Text style={styles.modeBadgeValue}>
-            {currentPointerMode === 'pointer' ? 'POINTEUR' : 'SÉLECTION'}
-          </Text>
+        <View style={styles.badges}>
+          <View style={styles.modeBadge}>
+            <Text style={styles.modeBadgeLabel}>MODE</Text>
+            <Text style={styles.modeBadgeValue}>
+              {currentPointerMode === 'pointer' ? 'POINTEUR' : 'SÉLECTION'}
+            </Text>
+          </View>
+
+          {elementDeleteMode ? (
+            <View style={styles.deleteBadge}>
+              <Text style={styles.deleteBadgeText}>SUPPRESSION ON</Text>
+            </View>
+          ) : null}
         </View>
       </View>
 
@@ -105,8 +118,23 @@ export const BrowserOptions = ({
         />
 
         <OptionButton
+          label={
+            elementDeleteMode
+              ? 'Supprimer élément : ON'
+              : 'Supprimer élément : OFF'
+          }
+          description={
+            elementDeleteMode
+              ? 'OK supprime ce qui est sous le pointeur. Les vidéos sont protégées.'
+              : 'Active un mode manuel pour retirer une pub ou un élément gênant.'
+          }
+          tone={elementDeleteMode ? 'danger' : 'cleaner'}
+          onPress={onToggleElementDeleteMode}
+        />
+
+        <OptionButton
           label="Fermer toutes les fenêtres"
-          description="Supprime les popups, modals, captchas et overlays visibles."
+          description="Nettoyage manuel des fenêtres et overlays détectés."
           tone="cleaner"
           onPress={onClosePopups}
         />
@@ -117,15 +145,16 @@ export const BrowserOptions = ({
           onPress={onOpenEmbeddedPlayer}
         />
 
+      </View>
+
+      <Text style={styles.sectionLabel}>NAVIGATION</Text>
+      <View style={styles.grid}>
         <OptionButton
           label="Relancer le lecteur"
           description="Réessaie la vidéo sans quitter la page."
           onPress={onRetryPlayer}
         />
-      </View>
 
-      <Text style={styles.sectionLabel}>NAVIGATION</Text>
-      <View style={styles.grid}>
         <OptionButton
           label="Recharger la page"
           description="Recharge complètement le site courant."
@@ -201,6 +230,10 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 3,
   },
+  badges: {
+    alignItems: 'flex-end',
+    gap: 7,
+  },
   modeBadge: {
     minWidth: 150,
     borderRadius: 16,
@@ -222,6 +255,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '900',
     marginTop: 2,
+  },
+  deleteBadge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#b64b58',
+    backgroundColor: '#42141b',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  deleteBadgeText: {
+    color: '#ffd9de',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.9,
   },
   divider: {
     height: 1,
@@ -262,6 +309,10 @@ const styles = StyleSheet.create({
   optionCleaner: {
     borderColor: '#6f5a39',
     backgroundColor: '#261f17',
+  },
+  optionDanger: {
+    borderColor: '#a63e4b',
+    backgroundColor: '#351119',
   },
   optionFocused: {
     borderColor: '#ffffff',
