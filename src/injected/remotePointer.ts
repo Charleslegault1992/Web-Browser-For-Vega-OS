@@ -10,7 +10,7 @@ export const createRemotePointerScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 6 }),
+    value: Object.freeze({ version: 7 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -204,6 +204,55 @@ export const createRemotePointerScript = (): string => {
     return typeof document.elementFromPoint === 'function'
       ? document.elementFromPoint(x, y)
       : null;
+  }
+
+  function deepElementAtPointer() {
+    var target = elementAtPointer();
+    var depth = 0;
+
+    while (
+      target &&
+      target.shadowRoot &&
+      typeof target.shadowRoot.elementFromPoint === 'function' &&
+      depth < 5
+    ) {
+      var nested = target.shadowRoot.elementFromPoint(x, y);
+      if (!nested || nested === target) {
+        break;
+      }
+
+      target = nested;
+      depth += 1;
+    }
+
+    return target;
+  }
+
+  function dispatchPointerEvent(target, type) {
+    if (
+      !target ||
+      typeof target.dispatchEvent !== 'function' ||
+      typeof PointerEvent !== 'function'
+    ) {
+      return;
+    }
+
+    try {
+      target.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          pointerId: 1,
+          pointerType: 'mouse',
+          isPrimary: true,
+          button: 0,
+          buttons: type === 'pointerdown' ? 1 : 0,
+          clientX: x,
+          clientY: y,
+          view: window
+        })
+      );
+    } catch (_) {}
   }
 
   function dispatchMouseEvent(target, type) {
@@ -608,6 +657,129 @@ export const createRemotePointerScript = (): string => {
     } catch (_) {}
   }
 
+  function interactiveTarget(target) {
+    if (!target || !target.closest) {
+      return target;
+    }
+
+    try {
+      return (
+        target.closest(
+          'button,a[href],input,label,summary,[role="button"],[onclick],[tabindex],video,audio'
+        ) || target
+      );
+    } catch (_) {
+      return target;
+    }
+  }
+
+  function targetText(target) {
+    if (!target) {
+      return '';
+    }
+
+    try {
+      return (
+        String(target.textContent || '') +
+        ' ' +
+        String(target.getAttribute && target.getAttribute('aria-label') || '') +
+        ' ' +
+        String(target.getAttribute && target.getAttribute('title') || '')
+      )
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase()
+        .slice(0, 160);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function isCloseTarget(target) {
+    var text = targetText(target);
+
+    return (
+      text === 'x' ||
+      text === '×' ||
+      text.indexOf('close') !== -1 ||
+      text.indexOf('fermer') !== -1 ||
+      text.indexOf('dismiss') !== -1
+    );
+  }
+
+  function closePopupAtPointer() {
+    try {
+      if (
+        window.__KAYLANE_TV_GUARD_API__ &&
+        typeof window.__KAYLANE_TV_GUARD_API__.closePopupAt === 'function'
+      ) {
+        return window.__KAYLANE_TV_GUARD_API__.closePopupAt(x, y) === true;
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
+  function toggleMedia(target) {
+    var media = null;
+
+    try {
+      media =
+        target && target.matches && target.matches('video,audio')
+          ? target
+          : target && target.closest
+            ? target.closest('video,audio')
+            : null;
+    } catch (_) {
+      media = null;
+    }
+
+    if (!media) {
+      return false;
+    }
+
+    armPlaybackShield();
+
+    try {
+      if (media.paused || media.ended) {
+        var result = media.play();
+        if (result && typeof result.catch === 'function') {
+          result.catch(function () {});
+        }
+      } else {
+        media.pause();
+      }
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function fireActivationSequence(target) {
+    if (!target) {
+      return false;
+    }
+
+    dispatchPointerEvent(target, 'pointerdown');
+    dispatchMouseEvent(target, 'mousedown');
+    dispatchPointerEvent(target, 'pointerup');
+    dispatchMouseEvent(target, 'mouseup');
+
+    try {
+      if (typeof target.click === 'function') {
+        target.click();
+      } else {
+        dispatchMouseEvent(target, 'click');
+      }
+
+      return true;
+    } catch (_) {
+      dispatchMouseEvent(target, 'click');
+      return true;
+    }
+  }
+
   function activate() {
     if (mode !== 'pointer') {
       return;
@@ -615,11 +787,29 @@ export const createRemotePointerScript = (): string => {
 
     createCursor();
 
-    // OK must always activate the topmost element under the visible pointer.
-    // Do not auto-promote any iframe found underneath it: source/server
-    // controls can visually sit above a player iframe on Movix.
-    var target = elementAtPointer();
-    if (!target || target === cursor || target === modeBadge) {
+    // Only promote when the iframe itself is the TOPMOST hit target. This
+    // keeps Movix Source/server buttons above the player fully clickable.
+    var hit = deepElementAtPointer();
+    if (!hit || hit === cursor || hit === modeBadge) {
+      return;
+    }
+
+    if (
+      hit.tagName === 'IFRAME' &&
+      frameArea(hit) > 0
+    ) {
+      armPlaybackShield();
+      promoteFrame(hit);
+      return;
+    }
+
+    var target = interactiveTarget(hit);
+
+    if (isCloseTarget(target) && closePopupAtPointer()) {
+      return;
+    }
+
+    if (toggleMedia(target)) {
       return;
     }
 
@@ -633,14 +823,7 @@ export const createRemotePointerScript = (): string => {
       }
     }
 
-    dispatchMouseEvent(target, 'mousedown');
-    dispatchMouseEvent(target, 'mouseup');
-
-    if (typeof target.click === 'function') {
-      target.click();
-    } else {
-      dispatchMouseEvent(target, 'click');
-    }
+    fireActivationSequence(target);
   }
 
   function setMode(nextMode, shouldAnnounce) {
