@@ -592,12 +592,24 @@ export const createRemotePointerScript = (): string => {
     return frames.length ? promoteFrame(frames[0]) : false;
   }
 
+  function armPlaybackShield() {
+    try {
+      if (
+        window.__KAYLANE_TV_GUARD_API__ &&
+        typeof window.__KAYLANE_TV_GUARD_API__.armPlaybackShield === 'function'
+      ) {
+        window.__KAYLANE_TV_GUARD_API__.armPlaybackShield();
+      }
+    } catch (_) {}
+  }
+
   function activate() {
     if (mode !== 'pointer') {
       return;
     }
 
     createCursor();
+    armPlaybackShield();
 
     if (promoteEmbeddedPlayerAtPointer()) {
       return;
