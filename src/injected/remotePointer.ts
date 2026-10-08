@@ -1,16 +1,22 @@
-export const createRemotePointerScript = (): string => `
+import {BLOCKED_AD_NAVIGATION_HOSTS} from '../navigation/rules';
+
+export const createRemotePointerScript = (): string => {
+  const blockedHosts = JSON.stringify(BLOCKED_AD_NAVIGATION_HOSTS);
+
+  return `
 (function () {
   if (window.__KAYLANE_TV_POINTER__) {
     return true;
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 3 }),
+    value: Object.freeze({ version: 4 }),
     configurable: false,
     enumerable: false,
     writable: false
   });
 
+  var BLOCKED_HOSTS = ${blockedHosts};
   var SIZE = 30;
   var ACCELERATION = 3000;
   var MAX_SPEED = 1050;
@@ -365,12 +371,129 @@ export const createRemotePointerScript = (): string => `
     ensureAnimation();
   }
 
+  function normalizeHost(host) {
+    return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
+  }
+
+  function hostMatchesRule(host, rule) {
+    var normalizedHost = normalizeHost(host);
+    var normalizedRule = normalizeHost(String(rule || '').replace(/^\\*\\./, ''));
+
+    return Boolean(
+      normalizedHost &&
+      normalizedRule &&
+      (normalizedHost === normalizedRule ||
+        normalizedHost.endsWith('.' + normalizedRule))
+    );
+  }
+
+  function parseHttpsUrl(url) {
+    try {
+      var parsed = new URL(url, document.baseURI);
+      return parsed.protocol === 'https:' ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function isBlockedUrl(url) {
+    var parsed = parseHttpsUrl(url);
+    if (!parsed) {
+      return true;
+    }
+
+    return BLOCKED_HOSTS.some(function (rule) {
+      return hostMatchesRule(parsed.hostname, rule);
+    });
+  }
+
+  function frameArea(frame) {
+    if (!frame || typeof frame.getBoundingClientRect !== 'function') {
+      return 0;
+    }
+
+    var rect = frame.getBoundingClientRect();
+    if (rect.width < 320 || rect.height < 160) {
+      return 0;
+    }
+
+    var viewportArea =
+      Math.max(1, viewportWidth()) *
+      Math.max(1, viewportHeight());
+
+    var area = Math.max(0, rect.width) * Math.max(0, rect.height);
+
+    return area / viewportArea >= 0.08 ? area : 0;
+  }
+
+  function embeddedPlayerAtPointer() {
+    if (typeof document.elementsFromPoint !== 'function') {
+      return null;
+    }
+
+    var candidates = document
+      .elementsFromPoint(x, y)
+      .filter(function (element) {
+        return (
+          element &&
+          element.tagName === 'IFRAME' &&
+          frameArea(element) > 0
+        );
+      })
+      .filter(function (frame) {
+        var src = frame.src || frame.getAttribute('src') || '';
+        return Boolean(parseHttpsUrl(src)) && !isBlockedUrl(src);
+      })
+      .sort(function (a, b) {
+        return frameArea(b) - frameArea(a);
+      });
+
+    return candidates.length ? candidates[0] : null;
+  }
+
+  function promoteEmbeddedPlayerAtPointer() {
+    var frame = embeddedPlayerAtPointer();
+    if (!frame) {
+      return false;
+    }
+
+    var src = frame.src || frame.getAttribute('src') || '';
+    var parsed = parseHttpsUrl(src);
+
+    if (!parsed) {
+      return false;
+    }
+
+    try {
+      if (
+        window.ReactNativeWebView &&
+        typeof window.ReactNativeWebView.postMessage === 'function'
+      ) {
+        window.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            type: 'kaylane-player-promote',
+            url: parsed.href,
+            x: Math.round(x),
+            y: Math.round(y)
+          })
+        );
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
   function activate() {
     if (mode !== 'pointer') {
       return;
     }
 
     createCursor();
+
+    if (promoteEmbeddedPlayerAtPointer()) {
+      return;
+    }
 
     var target = elementAtPointer();
     if (!target || target === cursor || target === modeBadge) {
@@ -495,6 +618,7 @@ export const createRemotePointerScript = (): string => `
       toggleMode: toggleMode,
       setDirection: setDirection,
       activate: activate,
+      promoteEmbeddedPlayerAtPointer: promoteEmbeddedPlayerAtPointer,
       refresh: function () {
         ensureUiAttached();
         render();
@@ -525,3 +649,4 @@ export const createRemotePointerScript = (): string => `
 })();
 true;
 `;
+};
