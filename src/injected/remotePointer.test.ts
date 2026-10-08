@@ -3,9 +3,9 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and exposes the v4 pointer API', () => {
+  it('is idempotent and exposes the v5 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
-    expect(script).toContain('version: 4');
+    expect(script).toContain('version: 5');
     expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
     expect(script).toContain('setMode: setMode');
     expect(script).toContain('setDirection: setDirection');
@@ -34,10 +34,16 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain("modeBadge.style.opacity = '0'");
   });
 
-  it('uses a frame-timed velocity model for smooth movement', () => {
+  it('uses a precision-first frame-timed velocity model', () => {
     expect(script).toContain('window.requestAnimationFrame(tick)');
-    expect(script).toContain('var ACCELERATION = 3000');
-    expect(script).toContain('var MAX_SPEED = 1050');
+    expect(script).toContain('var PRECISION_NUDGE = 7');
+    expect(script).toContain('var PRECISION_SPEED = 120');
+    expect(script).toContain('var PRECISION_HOLD_MS = 170');
+    expect(script).toContain('var ACCELERATION = 1450');
+    expect(script).toContain('var MAX_SPEED = 650');
+    expect(script).toContain('var FRICTION = 18');
+    expect(script).toContain('applyPrecisionNudge(key)');
+    expect(script).toContain('heldMs < PRECISION_HOLD_MS');
     expect(script).toContain('Math.exp(-FRICTION * dt)');
     expect(script).toContain('velocityX * dt');
     expect(script).toContain('velocityY * dt');
