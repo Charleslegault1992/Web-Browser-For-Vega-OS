@@ -180,7 +180,7 @@ export const App = () => {
         setNotice(null);
       }, NOTICE_DURATION_MS);
     },
-    [clearNoticeTimer],
+    [clearNoticeTimer, setWebPointerMode, showNotice],
   );
 
   useEffect(
@@ -358,7 +358,27 @@ export const App = () => {
 
   const handlePageGuardMessage = useCallback(
     (event: {nativeEvent: {data: string}}) => {
-      const message = parsePageGuardMessage(event.nativeEvent.data);
+      const rawData = event.nativeEvent.data;
+
+      try {
+        const pointerBridgeMessage = JSON.parse(rawData) as {
+          type?: string;
+          reason?: string;
+        };
+
+        if (
+          pointerBridgeMessage.type ===
+          'kaylane-pointer-native-activation'
+        ) {
+          setWebPointerMode('focus');
+          showNotice('Mode interaction · appuie OK pour cliquer');
+          return;
+        }
+      } catch (_) {
+        // Not a pointer bridge message; continue through normal page-guard parsing.
+      }
+
+      const message = parsePageGuardMessage(rawData);
 
       if (!message) {
         return;
