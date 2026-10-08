@@ -10,7 +10,7 @@ export const createRemotePointerScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 8 }),
+    value: Object.freeze({ version: 9 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -36,6 +36,7 @@ export const createRemotePointerScript = (): string => {
   var lastFrameAt = 0;
   var badgeTimer = 0;
   var mode = 'pointer';
+  var deleteMode = false;
   var keys = {
     ArrowLeft: false,
     ArrowRight: false,
@@ -177,7 +178,7 @@ export const createRemotePointerScript = (): string => {
     ensureUiAttached();
   }
 
-  function announceMode() {
+  function announceStatus(message) {
     createModeBadge();
     if (!modeBadge) {
       return;
@@ -188,8 +189,7 @@ export const createRemotePointerScript = (): string => {
       badgeTimer = 0;
     }
 
-    modeBadge.textContent =
-      mode === 'pointer' ? 'Mode pointeur' : 'Mode sélection';
+    modeBadge.textContent = message;
     modeBadge.style.opacity = '1';
 
     badgeTimer = setTimeout(function () {
@@ -198,6 +198,12 @@ export const createRemotePointerScript = (): string => {
         modeBadge.style.opacity = '0';
       }
     }, 1300);
+  }
+
+  function announceMode() {
+    announceStatus(
+      mode === 'pointer' ? 'Mode pointeur' : 'Mode sélection'
+    );
   }
 
   function elementAtPointer() {
@@ -300,6 +306,13 @@ export const createRemotePointerScript = (): string => {
     }
 
     cursor.style.display = mode === 'pointer' ? 'block' : 'none';
+    cursor.style.borderColor = deleteMode ? '#ff4d5e' : '#ffffff';
+    cursor.style.background = deleteMode
+      ? 'rgba(110, 0, 12, 0.42)'
+      : 'rgba(0, 0, 0, 0.30)';
+    cursor.style.boxShadow = deleteMode
+      ? '0 0 0 2px rgba(80,0,8,0.90), 0 0 18px rgba(255,77,94,0.70)'
+      : '0 0 0 2px rgba(0,0,0,0.82), 0 2px 12px rgba(0,0,0,0.72)';
     cursor.style.transform =
       'translate3d(' +
       Math.round(x - SIZE / 2) +
@@ -673,100 +686,17 @@ export const createRemotePointerScript = (): string => {
     }
   }
 
-  function targetText(target) {
-    if (!target) {
-      return '';
-    }
-
-    try {
-      return (
-        String(target.textContent || '') +
-        ' ' +
-        String(target.getAttribute && target.getAttribute('aria-label') || '') +
-        ' ' +
-        String(target.getAttribute && target.getAttribute('title') || '')
-      )
-        .replace(/\s+/g, ' ')
-        .trim()
-        .toLowerCase()
-        .slice(0, 160);
-    } catch (_) {
-      return '';
-    }
-  }
-
-  function isCloseTarget(target) {
-    var text = targetText(target);
-
-    return (
-      text === 'x' ||
-      text === '×' ||
-      text.indexOf('close') !== -1 ||
-      text.indexOf('fermer') !== -1 ||
-      text.indexOf('dismiss') !== -1
-    );
-  }
-
-  function closePopupAtPointer() {
+  function deleteElementAtPointer() {
     try {
       if (
         window.__KAYLANE_TV_GUARD_API__ &&
-        typeof window.__KAYLANE_TV_GUARD_API__.closePopupAt === 'function'
+        typeof window.__KAYLANE_TV_GUARD_API__.deleteElementAt === 'function'
       ) {
-        return window.__KAYLANE_TV_GUARD_API__.closePopupAt(x, y) === true;
+        return window.__KAYLANE_TV_GUARD_API__.deleteElementAt(x, y);
       }
     } catch (_) {}
 
-    return false;
-  }
-
-  function dismissTopmostPopupFrame(frame) {
-    if (
-      !frame ||
-      frame.tagName !== 'IFRAME'
-    ) {
-      return false;
-    }
-
-    try {
-      if (
-        window.__KAYLANE_TV_GUARD_API__ &&
-        typeof window.__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt === 'function'
-      ) {
-        return (
-          window.__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt(
-            x,
-            y,
-            true
-          ) === true
-        );
-      }
-    } catch (_) {}
-
-    return false;
-  }
-
-  function isNearTopRightOfFrame(frame) {
-    if (
-      !frame ||
-      frame.tagName !== 'IFRAME' ||
-      typeof frame.getBoundingClientRect !== 'function'
-    ) {
-      return false;
-    }
-
-    var rect = frame.getBoundingClientRect();
-    if (rect.width < 120 || rect.height < 80) {
-      return false;
-    }
-
-    var localX = x - rect.left;
-    var localY = y - rect.top;
-
-    return (
-      localX >= rect.width * 0.68 &&
-      localY <= Math.max(90, rect.height * 0.30)
-    );
+    return 'none';
   }
 
   function toggleMedia(target) {
@@ -836,8 +766,22 @@ export const createRemotePointerScript = (): string => {
 
     createCursor();
 
-    // Only promote when the iframe itself is the TOPMOST hit target. This
-    // keeps Movix Source/server buttons above the player fully clickable.
+    if (deleteMode) {
+      var deletionResult = deleteElementAtPointer();
+
+      if (deletionResult === 'deleted') {
+        announceStatus('Élément supprimé');
+      } else if (deletionResult === 'protected') {
+        announceStatus('Vidéo protégée');
+      } else {
+        announceStatus('Rien à supprimer');
+      }
+
+      return;
+    }
+
+    // Normal pointer mode never deletes DOM elements. It only activates the
+    // visible target, preserving the pre-visual-cleanup behavior.
     var hit = deepElementAtPointer();
     if (!hit || hit === cursor || hit === modeBadge) {
       return;
@@ -847,26 +791,12 @@ export const createRemotePointerScript = (): string => {
       hit.tagName === 'IFRAME' &&
       frameArea(hit) > 0
     ) {
-      // A close X inside a cross-origin iframe is invisible to the parent DOM.
-      // If the pointer is in the iframe's top-right close zone, dismiss and
-      // quarantine that popup frame instead of isolating it as a player.
-      if (
-        isNearTopRightOfFrame(hit) &&
-        dismissTopmostPopupFrame(hit)
-      ) {
-        return;
-      }
-
       armPlaybackShield();
       promoteFrame(hit);
       return;
     }
 
     var target = interactiveTarget(hit);
-
-    if (isCloseTarget(target) && closePopupAtPointer()) {
-      return;
-    }
 
     if (toggleMedia(target)) {
       return;
@@ -903,6 +833,21 @@ export const createRemotePointerScript = (): string => {
 
   function toggleMode() {
     setMode(mode === 'pointer' ? 'focus' : 'pointer', true);
+  }
+
+  function setDeleteMode(enabled, shouldAnnounce) {
+    deleteMode = Boolean(enabled);
+    render();
+
+    if (shouldAnnounce !== false) {
+      announceStatus(
+        deleteMode
+          ? 'Supprimer élément : ON'
+          : 'Supprimer élément : OFF'
+      );
+    }
+
+    return deleteMode;
   }
 
   function consume(event) {
@@ -982,6 +927,7 @@ export const createRemotePointerScript = (): string => {
       setMode: setMode,
       toggleMode: toggleMode,
       setDirection: setDirection,
+      setDeleteMode: setDeleteMode,
       activate: activate,
       promoteEmbeddedPlayerAtPointer: promoteEmbeddedPlayerAtPointer,
       promoteLargestEmbeddedPlayer: promoteLargestEmbeddedPlayer,
