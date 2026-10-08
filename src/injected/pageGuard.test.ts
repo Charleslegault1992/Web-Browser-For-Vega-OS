@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 10');
+    expect(script).toContain('version: 11');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -106,6 +106,24 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('cleanNode(mutation.target, true)');
     expect(script).toContain('cleanNode(node, true)');
     expect(script).toContain('containsLargePlayerFrame(node)');
+  });
+
+  it('preserves source/server chooser UI on Movix/Dofuz primary pages', () => {
+    expect(script).toContain('function isSourceSelectionSurface(node)');
+    expect(script).toContain("'source'");
+    expect(script).toContain("'server'");
+    expect(script).toContain("'serveur'");
+    expect(script).toContain("'mirror'");
+    expect(script).toContain("'lecteur'");
+    expect(script).toContain('interactiveCount >= 2');
+    expect(script).toContain('isSourceSelectionSurface(node)');
+  });
+
+  it('does not arm the aggressive shield from generic player wrappers on primary pages', () => {
+    expect(script).toContain("target.closest('video,audio,iframe')");
+    expect(script).toContain("!isPrimaryHost(window.location.hostname)");
+    expect(script).toContain("target.closest(\n          '[class*=\"player\"],[id*=\"player\"],[class*=\"video\"],[id*=\"video\"]'");
+    expect(script).not.toContain("playerTarget || visibleMediaCoverage() >= 0.08");
   });
 
   it('rechecks overlays on bounded DOM/style/modal changes without polling', () => {
