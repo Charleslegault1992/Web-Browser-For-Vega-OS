@@ -53,3 +53,22 @@ Validate on the target Fire TV:
 - player controls work normally in selection mode;
 - long OK returns to pointer mode;
 - Back and media transport keys remain unaffected.
+
+
+## Physical fix: prevent player spatial-focus bleed-through
+
+A fullscreen/active video player can keep its own spatial focus even while app-level D-pad listeners are receiving the same keys. Returning `true` from the input callback alone did not fully prevent the WebView/player focus engine from moving.
+
+Pointer mode now mounts a transparent, native focus-capture View above the WebView and explicitly focuses it with Vega `FocusManager`. The injected cursor remains visible underneath and receives movement through the pointer bridge. Because the WebView itself is not the native focus target in pointer mode, its player controls cannot move at the same time.
+
+Selection mode removes the capture View and programmatically returns focus to the WebView.
+
+## Long OK reliability
+
+Mode switching now uses a bounded 700 ms timer that starts on Select press instead of waiting for release-duration calculation. This avoids failures when a player swallows or delays the release event.
+
+The switch happens while OK is still held. The same physical hold is ignored until release so it cannot immediately toggle back into the previous mode.
+
+## Mode badge
+
+The top-right mode badge is no longer persistent. It appears only after a real pointer/selection mode change and fades completely after about 1.3 seconds. Page load, fullscreen entry, and pointer refresh do not show it.
