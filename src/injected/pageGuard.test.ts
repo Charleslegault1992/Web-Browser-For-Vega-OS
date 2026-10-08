@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 9');
+    expect(script).toContain('version: 10');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -83,13 +83,13 @@ describe('createPageGuardScript', () => {
   });
 
   it('suppresses modal-like overlays while preserving verification surfaces', () => {
-    expect(script).toContain('function isLikelyPlaybackModal(node)');
+    expect(script).toContain('function isLikelyPlaybackModal(node, aggressive)');
     expect(script).toContain('function isVerificationSurface(node)');
     expect(script).toContain("'captcha'");
     expect(script).toContain("'turnstile'");
     expect(script).toContain("node.getAttribute('aria-modal') === 'true'");
-    expect(script).toContain('coverage >= 0.10');
-    expect(script).toContain('zIndex >= 40');
+    expect(script).toContain('coverage >= 0.012');
+    expect(script).toContain('aggressive === true');
   });
 
   it('blocks browser dialogs while playback shield is active', () => {
@@ -99,8 +99,16 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('if (isPlaybackShieldActive())');
   });
 
+  it('aggressively removes newly-added or newly-shown small playback overlays', () => {
+    expect(script).toContain('function sweepAddedOverlayTree(root)');
+    expect(script).toContain('var MAX_ADDED_NODE_SCAN = 60');
+    expect(script).toContain('removePlaybackModal(root, true)');
+    expect(script).toContain('cleanNode(mutation.target, true)');
+    expect(script).toContain('cleanNode(node, true)');
+    expect(script).toContain('containsLargePlayerFrame(node)');
+  });
+
   it('rechecks overlays on bounded DOM/style/modal changes without polling', () => {
-    expect(script).toContain('mutation.addedNodes.forEach(cleanNode)');
     expect(script).toContain("'aria-modal'");
     expect(script).toContain("'aria-hidden'");
     expect(script).toContain("'open'");
