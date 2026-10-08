@@ -679,6 +679,40 @@ export const createPageGuardScript = (): string => {
     );
   }
 
+  function isLikelyPlayerFrame(frame) {
+    if (
+      !frame ||
+      frame.tagName !== 'IFRAME' ||
+      typeof frame.getBoundingClientRect !== 'function'
+    ) {
+      return false;
+    }
+
+    var raw =
+      frame.src ||
+      frame.getAttribute('src') ||
+      frame.getAttribute('data-src') ||
+      '';
+
+    if (raw && isBlockedHost(raw)) {
+      return false;
+    }
+
+    var rect = frame.getBoundingClientRect();
+    if (rect.width < 420 || rect.height < 220) {
+      return false;
+    }
+
+    var ratio = rect.height > 0 ? rect.width / rect.height : 0;
+    var coverage = elementCoverage(frame);
+
+    return (
+      coverage >= 0.16 &&
+      ratio >= 1.35 &&
+      ratio <= 2.40
+    );
+  }
+
   function frameOverlayEvidence(frame) {
     if (!frame || frame.tagName !== 'IFRAME') {
       return false;
@@ -747,7 +781,7 @@ export const createPageGuardScript = (): string => {
       force === true ||
       isQuarantinedPopupFrame(frame) ||
       isBlockedHost(candidateUrl(frame)) ||
-      frameOverlayEvidence(frame);
+      (!isLikelyPlayerFrame(frame) && frameOverlayEvidence(frame));
 
     if (!shouldRemove) {
       return false;
@@ -924,7 +958,7 @@ export const createPageGuardScript = (): string => {
 
       if (
         candidate.tagName === 'IFRAME'
-          ? removePopupFrame(candidate, popupPurgeActive())
+          ? removePopupFrame(candidate, false)
           : removeManualPopup(candidate)
       ) {
         removed += 1;
@@ -1740,6 +1774,7 @@ export const createPageGuardScript = (): string => {
     if (
       popupPurgeActive() &&
       frameOverlayEvidence(frame) &&
+      !isLikelyPlayerFrame(frame) &&
       !isSourceSelectionSurface(frame)
     ) {
       rememberPopupFrame(frame);
