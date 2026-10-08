@@ -109,6 +109,10 @@ expect(
   'Embedded activation handoff must give the user a short interaction hint.',
 );
 expect(
+  read('src/ui/BrowserOptions.tsx').includes('Interaction lecteur / vérification'),
+  'Browser options must expose an explicit native interaction fallback.',
+);
+expect(
   !pointerModeSource.includes('addUserInputListenerCallback(\n        UserInputEventName.Select'),
   'Pointer mode must not override Select through UserInputManager because that suppresses native Pressable OK handling.',
 );
