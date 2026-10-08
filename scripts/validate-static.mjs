@@ -323,12 +323,11 @@ expect(
   'Pointer must keep the reduced top speed and stronger stopping friction.',
 );
 expect(
-  remotePointerSource.includes(
-    'Only promote when the iframe itself is the TOPMOST hit target',
-  ) &&
+  remotePointerSource.includes('var hit = deepElementAtPointer()') &&
     remotePointerSource.includes("hit.tagName === 'IFRAME'") &&
+    remotePointerSource.includes('frameArea(hit) > 0') &&
     remotePointerSource.includes('promoteFrame(hit)'),
-  'Pointer OK may promote only a topmost iframe, never an iframe hidden under another control.',
+  'Pointer OK may promote only the iframe returned by the topmost pointer hit test.',
 );
 expect(
   remotePointerSource.includes('var deleteMode = false') &&
