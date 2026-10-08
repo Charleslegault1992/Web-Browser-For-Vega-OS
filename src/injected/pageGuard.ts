@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 15 }),
+    value: Object.freeze({ version: 16 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -679,6 +679,52 @@ export const createPageGuardScript = (): string => {
     );
   }
 
+  function layerStackAt(clientX, clientY) {
+    if (typeof document.elementsFromPoint !== 'function') {
+      return [];
+    }
+
+    try {
+      return document.elementsFromPoint(
+        Number(clientX) || 0,
+        Number(clientY) || 0
+      );
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function isPointerUiNode(node) {
+    if (!node || node.nodeType !== 1) {
+      return false;
+    }
+
+    try {
+      return Boolean(
+        node.getAttribute('data-kaylane-pointer') ||
+        node.getAttribute('data-kaylane-pointer-mode')
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function iframeForNode(node) {
+    if (!node || node.nodeType !== 1) {
+      return null;
+    }
+
+    if (node.tagName === 'IFRAME') {
+      return node;
+    }
+
+    try {
+      return node.closest ? node.closest('iframe') : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function isLikelyPlayerFrame(frame) {
     if (
       !frame ||
@@ -711,6 +757,234 @@ export const createPageGuardScript = (): string => {
       ratio >= 1.35 &&
       ratio <= 2.40
     );
+  }
+
+  function isPlayerLayer(node) {
+    if (!node || node.nodeType !== 1) {
+      return false;
+    }
+
+    try {
+      if (node.matches && node.matches('video,audio')) {
+        return true;
+      }
+    } catch (_) {}
+
+    var frame = iframeForNode(node);
+    if (frame && isLikelyPlayerFrame(frame)) {
+      return true;
+    }
+
+    return isPlayerUiSurface(node);
+  }
+
+  function playerLayerBelow(stack, startIndex) {
+    for (
+      var index = Math.max(0, startIndex + 1);
+      index < stack.length;
+      index += 1
+    ) {
+      if (isPlayerLayer(stack[index])) {
+        return stack[index];
+      }
+    }
+
+    return null;
+  }
+
+  function overlayRootForNode(node) {
+    if (!node || node.nodeType !== 1) {
+      return null;
+    }
+
+    if (node.tagName === 'IFRAME') {
+      return node;
+    }
+
+    var current = node;
+    var best = null;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 8
+    ) {
+      if (
+        !isPointerUiNode(current) &&
+        !isSourceSelectionSurface(current) &&
+        !isPlayerUiSurface(current)
+      ) {
+        var style;
+
+        try {
+          style = window.getComputedStyle(current);
+        } catch (_) {
+          style = null;
+        }
+
+        if (style) {
+          var position = String(style.position || '').toLowerCase();
+          var coverage = elementCoverage(current);
+
+          if (
+            coverage >= 0.003 &&
+            coverage <= 0.96 &&
+            (position === 'fixed' ||
+              position === 'sticky' ||
+              position === 'absolute' ||
+              modalSemanticSignal(current) ||
+              looksLikeVerificationModal(current) ||
+              hasCloseControl(current))
+          ) {
+            best = current;
+          }
+        }
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return best || node;
+  }
+
+  function visualObstructionAt(clientX, clientY) {
+    var stack = layerStackAt(clientX, clientY);
+
+    for (var index = 0; index < stack.length; index += 1) {
+      var candidate = stack[index];
+
+      if (
+        !candidate ||
+        candidate === document.body ||
+        candidate === document.documentElement ||
+        isPointerUiNode(candidate) ||
+        isSourceSelectionSurface(candidate) ||
+        isPlayerUiSurface(candidate)
+      ) {
+        continue;
+      }
+
+      if (!playerLayerBelow(stack, index)) {
+        continue;
+      }
+
+      var root = overlayRootForNode(candidate);
+
+      if (
+        root &&
+        root !== document.body &&
+        root !== document.documentElement &&
+        !isSourceSelectionSurface(root) &&
+        !isPlayerUiSurface(root)
+      ) {
+        return root;
+      }
+    }
+
+    return null;
+  }
+
+  function frameCoversUnderlyingPlayer(frame) {
+    if (
+      !frame ||
+      frame.tagName !== 'IFRAME' ||
+      typeof frame.getBoundingClientRect !== 'function'
+    ) {
+      return false;
+    }
+
+    var rect = frame.getBoundingClientRect();
+
+    if (rect.width < 80 || rect.height < 60) {
+      return false;
+    }
+
+    var points = [
+      [0.50, 0.50],
+      [0.25, 0.35],
+      [0.75, 0.35],
+      [0.25, 0.70],
+      [0.75, 0.70]
+    ];
+
+    for (var index = 0; index < points.length; index += 1) {
+      var clientX = rect.left + rect.width * points[index][0];
+      var clientY = rect.top + rect.height * points[index][1];
+      var stack = layerStackAt(clientX, clientY);
+      var frameIndex = stack.indexOf(frame);
+
+      if (
+        frameIndex >= 0 &&
+        playerLayerBelow(stack, frameIndex)
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function removeVisualObstructionAt(clientX, clientY) {
+    var obstruction = visualObstructionAt(clientX, clientY);
+
+    if (!obstruction) {
+      return false;
+    }
+
+    popupPurgeUntil = Math.max(
+      popupPurgeUntil,
+      Date.now() + 15000
+    );
+
+    if (obstruction.tagName === 'IFRAME') {
+      rememberPopupFrame(obstruction);
+      obstruction.remove();
+      restorePageAfterModalRemoval();
+      return true;
+    }
+
+    if (removeManualPopup(obstruction)) {
+      return true;
+    }
+
+    obstruction.remove();
+    restorePageAfterModalRemoval();
+    return true;
+  }
+
+  function sweepVisualObstructions() {
+    var removed = 0;
+    var width = Math.max(1, window.innerWidth || 1);
+    var height = Math.max(1, window.innerHeight || 1);
+    var xFractions = [0.12, 0.28, 0.44, 0.60, 0.76, 0.90];
+    var yFractions = [0.18, 0.34, 0.50, 0.66, 0.82];
+
+    for (var pass = 0; pass < 3; pass += 1) {
+      var removedThisPass = 0;
+
+      for (var yi = 0; yi < yFractions.length; yi += 1) {
+        for (var xi = 0; xi < xFractions.length; xi += 1) {
+          if (
+            removeVisualObstructionAt(
+              width * xFractions[xi],
+              height * yFractions[yi]
+            )
+          ) {
+            removed += 1;
+            removedThisPass += 1;
+          }
+        }
+      }
+
+      if (!removedThisPass) {
+        break;
+      }
+    }
+
+    return removed;
   }
 
   function frameOverlayEvidence(frame) {
@@ -781,6 +1055,7 @@ export const createPageGuardScript = (): string => {
       force === true ||
       isQuarantinedPopupFrame(frame) ||
       isBlockedHost(candidateUrl(frame)) ||
+      frameCoversUnderlyingPlayer(frame) ||
       (!isLikelyPlayerFrame(frame) && frameOverlayEvidence(frame));
 
     if (!shouldRemove) {
@@ -887,6 +1162,10 @@ export const createPageGuardScript = (): string => {
   }
 
   function closePopupAt(clientX, clientY) {
+    if (removeVisualObstructionAt(clientX, clientY)) {
+      return true;
+    }
+
     if (typeof document.elementFromPoint !== 'function') {
       return false;
     }
@@ -968,6 +1247,8 @@ export const createPageGuardScript = (): string => {
     if (document.documentElement) {
       removed += sweepAlwaysBlockedModals(document.documentElement);
     }
+
+    removed += sweepVisualObstructions();
 
     restorePageAfterModalRemoval();
     return removed;
@@ -1749,6 +2030,7 @@ export const createPageGuardScript = (): string => {
           return sweepPlaybackModals(document);
         },
         closePopupAt: closePopupAt,
+        dismissVisualObstructionAt: removeVisualObstructionAt,
         dismissPopupFrameAt: dismissPopupFrameAt,
         closeAllPopups: closeAllPopups
       }),
@@ -1765,6 +2047,7 @@ export const createPageGuardScript = (): string => {
 
     if (
       isQuarantinedPopupFrame(frame) ||
+      frameCoversUnderlyingPlayer(frame) ||
       (frame.src && isBlockedHost(frame.src))
     ) {
       frame.remove();
