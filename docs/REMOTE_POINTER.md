@@ -86,3 +86,21 @@ Pointer mode now splits responsibilities:
 - Selection mode still uses TVEventHandler observation for long OK back to Pointer mode without replacing the player's normal short-OK behavior.
 
 This matches Vega guidance: Pressable is the normal TV Select surface, while UserInputManager overrides platform behavior for keys it registers.
+
+
+## Embedded player / verification surfaces
+
+A pointer click injected into the top document cannot directly click inside a cross-origin iframe because the browser same-origin policy intentionally isolates that frame. This affects some embedded video controls and human-verification widgets.
+
+Kaylane TV now detects when the pointer is over an embedded native surface such as an iframe, object, or embed. On short OK:
+
+- the embedded surface is focused in the page;
+- the page sends a bounded bridge message to the native app;
+- Pointer mode switches to Selection mode;
+- the pointer capture surface unmounts;
+- the WebView regains native TV interaction;
+- a short notice tells the user to press OK to interact with the real embedded control.
+
+The next OK is therefore handled by the actual WebView/player/verification widget rather than a synthetic parent-document click.
+
+This does not solve or bypass a human-verification challenge. It only restores the user's ability to interact with the legitimate verification control using the Fire TV remote.
