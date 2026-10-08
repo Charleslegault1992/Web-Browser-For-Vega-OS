@@ -609,9 +609,11 @@ export const createRemotePointerScript = (): string => {
     }
 
     createCursor();
-    armPlaybackShield();
 
-    if (promoteEmbeddedPlayerAtPointer()) {
+    var embeddedFrame = embeddedPlayerAtPointer();
+    if (embeddedFrame) {
+      armPlaybackShield();
+      promoteFrame(embeddedFrame);
       return;
     }
 
