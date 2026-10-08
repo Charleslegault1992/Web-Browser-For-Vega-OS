@@ -138,3 +138,29 @@ The shield is intentionally bounded and optimized:
 Human-verification surfaces are preserved by explicit captcha / Turnstile / hCaptcha / reCAPTCHA / challenge / verification signals. The shield does not solve or bypass those challenges.
 
 While the shield is active, blocking JavaScript alert/confirm/prompt dialogs are also suppressed so they cannot cover or freeze playback.
+
+
+## Small playback modal suppression (physical-device follow-up)
+
+A later Fire TV capture showed a smaller circular ad modal with a close X sitting over the video. The previous shield focused mostly on large or semantically-labelled overlays, so compact ad widgets could still survive.
+
+Playback shield v10 now treats newly-added or newly-shown overlay nodes more aggressively while the shield is armed:
+
+- any newly-added fixed/sticky/absolute overlay covering at least about 1.2% of the viewport can be removed even without a useful z-index;
+- attribute changes that reveal a previously hidden overlay are treated the same way;
+- descendants of a newly-added wrapper are scanned with a strict cap of 60 candidates;
+- real video/audio nodes, fullscreen content, verification widgets, player controls, and containers holding a large real player iframe remain protected;
+- no polling is added.
+
+This specifically targets compact pop-over ads and circular/card modals that appear immediately after pressing Play.
+
+## Browser Back history source of truth
+
+Vega's native canGoBack value can temporarily report false after player/source promotion even though the WebView still has real browser history.
+
+While browsing, Back now always asks the page's DOM history first:
+
+- if window.history.length > 1, Kaylane TV runs window.history.back();
+- only when DOM history is genuinely empty does the page bridge tell the native app to return to Kaylane TV home.
+
+This keeps Back inside Dofuz/Movix/player history so the user can return to the previous source selector instead of jumping straight to the Kaylane home screen.
