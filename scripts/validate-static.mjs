@@ -165,6 +165,29 @@ expect(
   pageGuardSource.includes('visibleMediaCoverage() >= 0.20'),
   'Promoted player pages must clean large external overlays above visible media.',
 );
+expect(
+  pageGuardSource.includes('function armPlaybackShield(durationMs)') &&
+    pageGuardSource.includes('var PLAYBACK_SHIELD_MS = 20000'),
+  'Playback modal shield must stay event-driven and bounded.',
+);
+expect(
+  pageGuardSource.includes('function isVerificationSurface(node)') &&
+    pageGuardSource.includes("'turnstile'") &&
+    pageGuardSource.includes("'captcha'"),
+  'Playback modal shield must preserve human-verification surfaces.',
+);
+expect(
+  pageGuardSource.includes('window.alert = function ()') &&
+    pageGuardSource.includes('window.confirm = function ()') &&
+    pageGuardSource.includes('window.prompt = function ()'),
+  'Playback shield must suppress blocking browser dialogs during player interaction.',
+);
+expect(
+  pageGuardSource.includes("'aria-modal'") &&
+    pageGuardSource.includes("'aria-hidden'") &&
+    pageGuardSource.includes("'open'"),
+  'Playback shield must recheck dynamic modal state changes.',
+);
 const remotePointerSource = read('src/injected/remotePointer.ts');
 expect(
   remotePointerSource.includes('var PRECISION_NUDGE = 7') &&
