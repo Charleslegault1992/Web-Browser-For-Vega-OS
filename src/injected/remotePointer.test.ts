@@ -61,6 +61,9 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain('frameArea(element) > 0');
     expect(script).toContain('kaylane-player-promote');
     expect(script).toContain('promoteEmbeddedPlayerAtPointer');
+    expect(script).toContain('promoteLargestEmbeddedPlayer');
+    expect(script).toContain("frame.getAttribute('data-src')");
+    expect(script).toContain("frame.getAttribute('data-lazy-src')");
     expect(script).toContain('BLOCKED_HOSTS');
   });
 
