@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 6 }),
+    value: Object.freeze({ version: 7 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -127,6 +127,172 @@ export const createPageGuardScript = (): string => {
     event.preventDefault();
   }
 
+  function isTopDocument() {
+    try {
+      return window === window.top;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function activeFullscreenElement() {
+    return document.fullscreenElement || document.webkitFullscreenElement || null;
+  }
+
+  function touchesFullscreenTree(node) {
+    var fullscreen = activeFullscreenElement();
+
+    if (!fullscreen || !node) {
+      return false;
+    }
+
+    try {
+      return (
+        fullscreen === node ||
+        (fullscreen.contains && fullscreen.contains(node)) ||
+        (node.contains && node.contains(fullscreen))
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function elementCoverage(node) {
+    if (!node || typeof node.getBoundingClientRect !== 'function') {
+      return 0;
+    }
+
+    var rect = node.getBoundingClientRect();
+    var viewportArea =
+      Math.max(1, window.innerWidth || 1) *
+      Math.max(1, window.innerHeight || 1);
+
+    return Math.max(0, rect.width) * Math.max(0, rect.height) / viewportArea;
+  }
+
+  function parsedZIndex(style) {
+    var value = Number.parseInt(
+      style && style.zIndex ? style.zIndex : '0',
+      10
+    );
+
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function nodeHasExternalEscape(node) {
+    if (!node || node.nodeType !== 1) {
+      return false;
+    }
+
+    var candidates = [];
+
+    if (node.matches && node.matches('a[href],iframe[src]')) {
+      candidates.push(node);
+    }
+
+    if (node.querySelectorAll) {
+      node.querySelectorAll('a[href],iframe[src]').forEach(function (child) {
+        if (candidates.length < 12) {
+          candidates.push(child);
+        }
+      });
+    }
+
+    return candidates.some(function (candidate) {
+      var url =
+        candidate.tagName === 'IFRAME'
+          ? candidate.src || candidate.getAttribute('src') || ''
+          : candidate.href || candidate.getAttribute('href') || '';
+
+      if (!url) {
+        return false;
+      }
+
+      if (isBlockedHost(url)) {
+        return true;
+      }
+
+      return (
+        candidate.tagName === 'A' &&
+        isUnwantedPrimaryPageEscape(url)
+      );
+    });
+  }
+
+  function isLikelyAdOverlay(node) {
+    if (
+      !isTopDocument() ||
+      !isPrimaryHost(window.location.hostname) ||
+      !node ||
+      node.nodeType !== 1 ||
+      node === document.documentElement ||
+      node === document.body ||
+      touchesFullscreenTree(node)
+    ) {
+      return false;
+    }
+
+    var style;
+
+    try {
+      style = window.getComputedStyle(node);
+    } catch (_) {
+      return false;
+    }
+
+    var position = String(style.position || '').toLowerCase();
+    var coverage = elementCoverage(node);
+    var zIndex = parsedZIndex(style);
+
+    if (
+      coverage < 0.18 ||
+      (position !== 'fixed' &&
+        position !== 'sticky' &&
+        position !== 'absolute') ||
+      zIndex < 50
+    ) {
+      return false;
+    }
+
+    if (
+      node.matches &&
+      node.matches('video,audio,[data-kaylane-pointer],[data-kaylane-pointer-mode]')
+    ) {
+      return false;
+    }
+
+    if (
+      node.querySelector &&
+      node.querySelector('video,audio')
+    ) {
+      return false;
+    }
+
+    return nodeHasExternalEscape(node);
+  }
+
+  function removeLikelyAdOverlay(node) {
+    var current = node;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 6
+    ) {
+      if (isLikelyAdOverlay(current)) {
+        current.remove();
+        return true;
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
   function createPopupLocationStub() {
     var hrefValue = 'about:blank';
 
@@ -236,6 +402,7 @@ export const createPageGuardScript = (): string => {
       isUnwantedPrimaryPageEscape(href)
     ) {
       preventNavigationDefault(event);
+      removeLikelyAdOverlay(anchor);
     }
   }, true);
 
@@ -315,12 +482,20 @@ export const createPageGuardScript = (): string => {
       return;
     }
 
+    if (removeLikelyAdOverlay(node)) {
+      return;
+    }
+
     if (node.tagName === 'IFRAME' && cleanIframe(node)) {
       return;
     }
 
     if (typeof node.querySelectorAll === 'function') {
       node.querySelectorAll('iframe[src]').forEach(cleanIframe);
+
+      node.querySelectorAll('a[href],iframe[src]').forEach(function (candidate) {
+        removeLikelyAdOverlay(candidate);
+      });
     }
   }
 
