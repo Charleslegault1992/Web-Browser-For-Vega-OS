@@ -124,6 +124,16 @@ expect(
   'Browser options must expose selection-to-pointer switching.',
 );
 expect(
+  browserOptionsSource.includes('Fermer toutes les fenêtres') &&
+    browserOptionsSource.includes('onClosePopups'),
+  'Browser options must expose the manual close-all-popups recovery action.',
+);
+expect(
+  browserOptionsSource.includes("width: '49%'") &&
+    browserOptionsSource.includes("flexWrap: 'wrap'"),
+  'Browser options must stay in a compact two-column TV-safe grid.',
+);
+expect(
   appSource.includes('inputEnabled:'),
   'Pointer mode must preserve state while temporarily disabling browser input for overlays.',
 );
@@ -152,6 +162,18 @@ expect(
   pageGuardSource.includes('__KAYLANE_TV_GUARD_API__') &&
     pageGuardSource.includes('allowPlayerNavigation'),
   'Navigation guard must expose one-shot promoted-player navigation.',
+);
+expect(
+  pageGuardSource.includes('function closePopupAt(clientX, clientY)') &&
+    pageGuardSource.includes('function closeAllPopups()') &&
+    pageGuardSource.includes('closePopupAt: closePopupAt') &&
+    pageGuardSource.includes('closeAllPopups: closeAllPopups'),
+  'Navigation guard must expose manual popup cleanup APIs.',
+);
+expect(
+  appSource.includes('kaylane-popup-cleanup') &&
+    appSource.includes('closeAllPopups'),
+  'App menu cleanup must invoke the page popup cleaner and report completion.',
 );
 expect(
   appSource.includes('kaylane-player-promote') &&
@@ -266,12 +288,19 @@ expect(
 );
 expect(
   remotePointerSource.includes(
-    'Do not auto-promote any iframe found underneath it',
+    'Only promote when the iframe itself is the TOPMOST hit target',
   ) &&
-    !remotePointerSource.includes(
-      'var embeddedFrame = embeddedPlayerAtPointer();',
-    ),
-  'Pointer OK must activate the topmost control instead of auto-isolating an iframe underneath it.',
+    remotePointerSource.includes("hit.tagName === 'IFRAME'") &&
+    remotePointerSource.includes('promoteFrame(hit)'),
+  'Pointer OK may promote only a topmost iframe, never an iframe hidden under another control.',
+);
+expect(
+  remotePointerSource.includes('function deepElementAtPointer()') &&
+    remotePointerSource.includes('function interactiveTarget(target)') &&
+    remotePointerSource.includes("dispatchPointerEvent(target, 'pointerdown')") &&
+    remotePointerSource.includes('function toggleMedia(target)') &&
+    remotePointerSource.includes('function closePopupAtPointer()'),
+  'Pointer OK must keep robust play/close/custom-control activation fallbacks.',
 );
 expect(
   remotePointerSource.includes('function promoteLargestEmbeddedPlayer()') &&
