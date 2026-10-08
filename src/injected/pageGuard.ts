@@ -501,6 +501,9 @@ export const createPageGuardScript = (): string => {
 
   function cleanInitialDocument() {
     document.querySelectorAll('iframe[src]').forEach(cleanIframe);
+    document.querySelectorAll('a[href],iframe[src]').forEach(function (candidate) {
+      removeLikelyAdOverlay(candidate);
+    });
   }
 
   if (document.readyState === 'loading') {
@@ -524,7 +527,7 @@ export const createPageGuardScript = (): string => {
 
   observer.observe(document.documentElement || document, {
     attributes: true,
-    attributeFilter: ['src'],
+    attributeFilter: ['src', 'href', 'style', 'class'],
     childList: true,
     subtree: true
   });
