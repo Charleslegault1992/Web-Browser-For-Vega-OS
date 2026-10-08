@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 13 }),
+    value: Object.freeze({ version: 14 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -576,6 +576,137 @@ export const createPageGuardScript = (): string => {
     }
 
     return false;
+  }
+
+  function isManualPopupCandidate(node) {
+    if (
+      !node ||
+      node.nodeType !== 1 ||
+      node === document.body ||
+      node === document.documentElement ||
+      touchesFullscreenTree(node) ||
+      isSourceSelectionSurface(node) ||
+      isPlayerUiSurface(node) ||
+      containsLargePlayerFrame(node)
+    ) {
+      return false;
+    }
+
+    var style;
+
+    try {
+      style = window.getComputedStyle(node);
+    } catch (_) {
+      return false;
+    }
+
+    var position = String(style.position || '').toLowerCase();
+    var coverage = elementCoverage(node);
+    var overlayPosition =
+      position === 'fixed' ||
+      position === 'sticky' ||
+      position === 'absolute';
+
+    if (!overlayPosition || coverage < 0.003 || coverage > 0.96) {
+      return false;
+    }
+
+    return (
+      modalSemanticSignal(node) ||
+      looksLikeVerificationModal(node) ||
+      hasCloseControl(node) ||
+      nodeHasBlockedHost(node) ||
+      nodeHasExternalEscape(node)
+    );
+  }
+
+  function removeManualPopup(node) {
+    var current = node;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 8
+    ) {
+      if (isManualPopupCandidate(current)) {
+        current.remove();
+        restorePageAfterModalRemoval();
+        return true;
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
+  function closePopupAt(clientX, clientY) {
+    if (typeof document.elementFromPoint !== 'function') {
+      return false;
+    }
+
+    var target = document.elementFromPoint(
+      Number(clientX) || 0,
+      Number(clientY) || 0
+    );
+
+    return removeManualPopup(target);
+  }
+
+  function closeAllPopups() {
+    var removed = 0;
+    var selector = [
+      'dialog',
+      '[role="dialog"]',
+      '[role="alertdialog"]',
+      '[aria-modal="true"]',
+      '[class*="modal"]',
+      '[id*="modal"]',
+      '[class*="popup"]',
+      '[id*="popup"]',
+      '[class*="interstitial"]',
+      '[id*="interstitial"]',
+      '[class*="overlay"]',
+      '[id*="overlay"]',
+      '[class*="captcha"]',
+      '[id*="captcha"]',
+      '[class*="turnstile"]',
+      '[id*="turnstile"]',
+      '[class*="recaptcha"]',
+      '[id*="recaptcha"]',
+      '[class*="advert"]',
+      '[id*="advert"]',
+      '[class*="sponsor"]',
+      '[id*="sponsor"]'
+    ].join(',');
+
+    var candidates;
+
+    try {
+      candidates = document.querySelectorAll(selector);
+    } catch (_) {
+      candidates = [];
+    }
+
+    for (
+      var index = candidates.length - 1;
+      index >= 0 && index >= candidates.length - 120;
+      index -= 1
+    ) {
+      if (removeManualPopup(candidates[index])) {
+        removed += 1;
+      }
+    }
+
+    if (document.documentElement) {
+      removed += sweepAlwaysBlockedModals(document.documentElement);
+    }
+
+    restorePageAfterModalRemoval();
+    return removed;
   }
 
   function isSourceSelectionSurface(node) {
@@ -1352,7 +1483,9 @@ export const createPageGuardScript = (): string => {
         armPlaybackShield: armPlaybackShield,
         sweepPlaybackModals: function () {
           return sweepPlaybackModals(document);
-        }
+        },
+        closePopupAt: closePopupAt,
+        closeAllPopups: closeAllPopups
       }),
       configurable: false,
       enumerable: false,
