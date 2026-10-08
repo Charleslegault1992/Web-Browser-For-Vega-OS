@@ -225,7 +225,30 @@ export const App = () => {
 
   const goBack = useCallback(() => {
     setFatalError(null);
-    webViewRef.current?.goBack();
+    webViewRef.current?.injectJavaScript(
+      `
+(function () {
+  try {
+    if (window.history && window.history.length > 1) {
+      window.history.back();
+      return true;
+    }
+
+    if (
+      window.ReactNativeWebView &&
+      typeof window.ReactNativeWebView.postMessage === 'function'
+    ) {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({type: 'kaylane-browser-history-empty'})
+      );
+    }
+  } catch (_) {}
+
+  return true;
+})();
+true;
+`,
+    );
   }, []);
 
   const dismissOverlay = useCallback(() => {
@@ -416,6 +439,11 @@ true;`,
           promotePlayerUrl(bridgeMessage.url);
           return;
         }
+
+        if (bridgeMessage.type === 'kaylane-browser-history-empty') {
+          goHome();
+          return;
+        }
       } catch (_) {
         // Continue through the navigation-guard parser.
       }
@@ -447,7 +475,7 @@ true;`,
         return;
       }
     },
-    [clearNoticeTimer, promotePlayerUrl],
+    [clearNoticeTimer, goHome, promotePlayerUrl],
   );
 
   const handleNavigationRequest = useCallback(
