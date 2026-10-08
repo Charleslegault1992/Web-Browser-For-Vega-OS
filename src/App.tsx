@@ -430,6 +430,7 @@ true;`,
         const bridgeMessage = JSON.parse(rawData) as {
           type?: string;
           url?: string;
+          count?: number;
         };
 
         if (
@@ -442,6 +443,19 @@ true;`,
 
         if (bridgeMessage.type === 'kaylane-browser-history-empty') {
           goHome();
+          return;
+        }
+
+        if (bridgeMessage.type === 'kaylane-popup-cleanup') {
+          const count =
+            typeof bridgeMessage.count === 'number'
+              ? bridgeMessage.count
+              : 0;
+          showNotice(
+            count > 0
+              ? `${count} fenêtre${count > 1 ? 's' : ''} fermée${count > 1 ? 's' : ''}`
+              : 'Aucune fenêtre à fermer',
+          );
           return;
         }
       } catch (_) {
@@ -475,7 +489,7 @@ true;`,
         return;
       }
     },
-    [clearNoticeTimer, goHome, promotePlayerUrl],
+    [clearNoticeTimer, goHome, promotePlayerUrl, showNotice],
   );
 
   const handleNavigationRequest = useCallback(
@@ -486,6 +500,41 @@ true;`,
   const handleMainFrameFailure = useCallback((message: string) => {
     setLoading(false);
     setFatalError(message);
+  }, []);
+
+  const closeAllPopups = useCallback(() => {
+    setOptionsOpen(false);
+    webViewRef.current?.injectJavaScript(
+      `
+(function () {
+  var count = 0;
+
+  try {
+    if (
+      window.__KAYLANE_TV_GUARD_API__ &&
+      typeof window.__KAYLANE_TV_GUARD_API__.closeAllPopups === 'function'
+    ) {
+      count = window.__KAYLANE_TV_GUARD_API__.closeAllPopups() || 0;
+    }
+
+    if (
+      window.ReactNativeWebView &&
+      typeof window.ReactNativeWebView.postMessage === 'function'
+    ) {
+      window.ReactNativeWebView.postMessage(
+        JSON.stringify({
+          type: 'kaylane-popup-cleanup',
+          count: count
+        })
+      );
+    }
+  } catch (_) {}
+
+  return true;
+})();
+true;
+`,
+    );
   }, []);
 
   const retryPlayer = useCallback(() => {
@@ -599,6 +648,7 @@ true;`,
             );
           }}
           onOpenEmbeddedPlayer={promotePlayerUnderPointer}
+          onClosePopups={closeAllPopups}
           onRetryPlayer={retryPlayer}
           onReloadPage={reloadCurrentPage}
           onHome={goHome}
