@@ -110,10 +110,11 @@ export const App = () => {
   });
 
   const focusBrowserInputTarget = useCallback(() => {
-    const target =
-      webPointerMode === 'pointer'
-        ? pointerCaptureRef.current
-        : webViewRef.current;
+    if (webPointerMode !== 'pointer') {
+      return;
+    }
+
+    const target = pointerCaptureRef.current;
     const handle = target ? findNodeHandle(target) : null;
 
     if (handle) {
