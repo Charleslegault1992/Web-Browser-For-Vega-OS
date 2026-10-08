@@ -129,6 +129,18 @@ expect(
   'Browser options must expose the manual close-all-popups recovery action.',
 );
 expect(
+  browserOptionsSource.includes('Supprimer élément : ON') &&
+    browserOptionsSource.includes('Supprimer élément : OFF') &&
+    browserOptionsSource.includes('onToggleElementDeleteMode'),
+  'Browser options must expose an explicit delete-element ON/OFF toggle.',
+);
+expect(
+  appSource.includes('elementDeleteMode') &&
+    appSource.includes('syncElementDeleteMode') &&
+    appSource.includes('setDeleteMode'),
+  'Native app state must keep delete-element mode synchronized with the page pointer.',
+);
+expect(
   browserOptionsSource.includes("width: '49%'") &&
     browserOptionsSource.includes("flexWrap: 'wrap'"),
   'Browser options must stay in a compact two-column TV-safe grid.',
@@ -167,10 +179,13 @@ expect(
   pageGuardSource.includes('function closePopupAt(clientX, clientY)') &&
     pageGuardSource.includes('function dismissPopupFrameAt(clientX, clientY, forceCloseCorner)') &&
     pageGuardSource.includes('function closeAllPopups()') &&
+    pageGuardSource.includes('function deleteElementAt(clientX, clientY)') &&
+    pageGuardSource.includes('function isProtectedMediaDeletionTarget(node)') &&
+    pageGuardSource.includes('deleteElementAt: deleteElementAt') &&
     pageGuardSource.includes('closePopupAt: closePopupAt') &&
     pageGuardSource.includes('dismissPopupFrameAt: dismissPopupFrameAt') &&
     pageGuardSource.includes('closeAllPopups: closeAllPopups'),
-  'Navigation guard must expose manual popup cleanup and iframe-dismiss APIs.',
+  'Navigation guard must expose popup cleanup plus explicit media-safe element deletion.',
 );
 expect(
   pageGuardSource.includes('var quarantinedPopupSignatures = new Set()') &&
@@ -311,19 +326,32 @@ expect(
   'Pointer OK may promote only a topmost iframe, never an iframe hidden under another control.',
 );
 expect(
-  remotePointerSource.includes('function isNearTopRightOfFrame(frame)') &&
-    remotePointerSource.includes('function dismissTopmostPopupFrame(frame)') &&
-    remotePointerSource.includes('__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt') &&
-    remotePointerSource.includes('isNearTopRightOfFrame(hit)'),
-  'Pointer OK on an iframe close corner must dismiss/quarantine the popup instead of isolating it.',
+  remotePointerSource.includes('var deleteMode = false') &&
+    remotePointerSource.includes('function setDeleteMode(enabled, shouldAnnounce)') &&
+    remotePointerSource.includes('function deleteElementAtPointer()') &&
+    remotePointerSource.includes('__KAYLANE_TV_GUARD_API__.deleteElementAt') &&
+    remotePointerSource.includes('if (deleteMode)'),
+  'Element deletion must be explicit opt-in pointer behavior.',
+);
+expect(
+  remotePointerSource.includes('Normal pointer mode never deletes DOM elements') &&
+    !remotePointerSource.includes('function closePopupAtPointer()') &&
+    !remotePointerSource.includes('function dismissTopmostPopupFrame(frame)') &&
+    !remotePointerSource.includes('function isNearTopRightOfFrame(frame)'),
+  'Normal pointer OK must not auto-delete page elements.',
 );
 expect(
   remotePointerSource.includes('function deepElementAtPointer()') &&
     remotePointerSource.includes('function interactiveTarget(target)') &&
     remotePointerSource.includes("dispatchPointerEvent(target, 'pointerdown')") &&
-    remotePointerSource.includes('function toggleMedia(target)') &&
-    remotePointerSource.includes('function closePopupAtPointer()'),
-  'Pointer OK must keep robust play/close/custom-control activation fallbacks.',
+    remotePointerSource.includes('function toggleMedia(target)'),
+  'Normal pointer OK must keep robust play/custom-control activation.',
+);
+expect(
+  remotePointerSource.includes("cursor.style.borderColor = deleteMode ? '#ff4d5e' : '#ffffff'") &&
+    remotePointerSource.includes("'Supprimer élément : ON'") &&
+    remotePointerSource.includes("'Vidéo protégée'"),
+  'Delete-element mode must be visually distinct and protect video targets.',
 );
 expect(
   remotePointerSource.includes('function promoteLargestEmbeddedPlayer()') &&
