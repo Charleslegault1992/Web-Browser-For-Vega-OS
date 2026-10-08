@@ -3,9 +3,9 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and exposes the v5 pointer API', () => {
+  it('is idempotent and exposes the v6 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
-    expect(script).toContain('version: 5');
+    expect(script).toContain('version: 6');
     expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
     expect(script).toContain('setMode: setMode');
     expect(script).toContain('setDirection: setDirection');
@@ -55,14 +55,18 @@ describe('createRemotePointerScript', () => {
     expect(script).not.toContain('setInterval(');
   });
 
-  it('uses hit testing and native element click compatibility', () => {
+  it('uses topmost hit testing and native element click compatibility', () => {
     expect(script).toContain('document.elementFromPoint(x, y)');
     expect(script).toContain('target.click()');
-    expect(script).toContain('armPlaybackShield()');
-    expect(script).toContain('__KAYLANE_TV_GUARD_API__.armPlaybackShield');
+    expect(script).toContain(
+      'Do not auto-promote any iframe found underneath it',
+    );
+    expect(script).not.toContain(
+      'var embeddedFrame = embeddedPlayerAtPointer();',
+    );
   });
 
-  it('promotes a large HTTPS iframe under the pointer instead of fake-clicking across origins', () => {
+  it('keeps iframe promotion as an explicit menu/API action only', () => {
     expect(script).toContain('function embeddedPlayerAtPointer()');
     expect(script).toMatch(/document\s*\.\s*elementsFromPoint\(x, y\)/);
     expect(script).toContain("element.tagName === 'IFRAME'");
@@ -70,6 +74,8 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain('kaylane-player-promote');
     expect(script).toContain('promoteEmbeddedPlayerAtPointer');
     expect(script).toContain('promoteLargestEmbeddedPlayer');
+    expect(script).toContain('armPlaybackShield()');
+    expect(script).toContain('__KAYLANE_TV_GUARD_API__.armPlaybackShield');
     expect(script).toContain("frame.getAttribute('data-src')");
     expect(script).toContain("frame.getAttribute('data-lazy-src')");
     expect(script).toContain('BLOCKED_HOSTS');
