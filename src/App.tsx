@@ -180,7 +180,7 @@ export const App = () => {
         setNotice(null);
       }, NOTICE_DURATION_MS);
     },
-    [clearNoticeTimer, setWebPointerMode, showNotice],
+    [clearNoticeTimer],
   );
 
   useEffect(
@@ -405,7 +405,7 @@ export const App = () => {
         return;
       }
     },
-    [clearNoticeTimer],
+    [clearNoticeTimer, setWebPointerMode, showNotice],
   );
 
   const handleNavigationRequest = useCallback(
