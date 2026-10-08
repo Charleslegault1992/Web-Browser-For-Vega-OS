@@ -132,3 +132,20 @@ Pointer v5 now uses a precision-first movement curve:
 - edge scrolling is also slower.
 
 Result: quick taps are for fine aiming, while holding a direction still ramps into smooth continuous travel across the TV screen.
+
+
+## Robust OK activation + compact menu recovery
+
+Physical Fire TV testing showed that short OK could still fail on some Play buttons and close X controls.
+
+Pointer v7 now uses a stronger activation path:
+- resolves the deepest same-origin/shadow-DOM element under the pointer;
+- promotes an iframe only when the iframe itself is the topmost visible hit target;
+- resolves the nearest interactive button/link/control ancestor;
+- dispatches pointerdown/pointerup plus mouse down/up before native click();
+- directly toggles HTML5 video/audio play/pause when the actual media element is targeted;
+- close/X controls first ask the navigation guard to remove the popup containing that point.
+
+The browser menu now also exposes **Fermer toutes les fenêtres**, which runs a manual bounded cleanup pass for visible popup/modal/captcha/interstitial overlays while preserving legitimate source-selection and player surfaces.
+
+The options panel was changed to a compact two-column TV-safe grid. All actions fit on one 720p screen, so focus no longer has to scroll beyond the visible panel and then become difficult to recover with the D-pad.
