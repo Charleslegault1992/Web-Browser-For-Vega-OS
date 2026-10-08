@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 7');
+    expect(script).toContain('version: 8');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -28,6 +28,14 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('isUnwantedPrimaryPageEscape(href)');
     expect(script).toContain('isBlockedHost(href)');
     expect(script).toContain('preventNavigationDefault(event)');
+  });
+
+  it('allows one explicit promoted-player navigation without opening a second context', () => {
+    expect(script).toContain('allowPlayerNavigation');
+    expect(script).toContain('allowedPlayerNavigation');
+    expect(script).toContain('expiresAt: Date.now() + 6000');
+    expect(script).toContain('__KAYLANE_TV_GUARD_API__');
+    expect(script).toContain('isAllowedPlayerNavigation(destination.href)');
   });
 
   it('cancels scripted same-tab escapes when the Navigation API is available', () => {
@@ -55,12 +63,14 @@ describe('createPageGuardScript', () => {
     expect(script).not.toContain("querySelectorAll('iframe').forEach(function");
   });
 
-  it('removes only large external overlay candidates on primary top pages', () => {
+  it('removes large external overlays on primary and promoted player pages', () => {
     expect(script).toContain('function isLikelyAdOverlay(node)');
     expect(script).toContain('coverage < 0.18');
     expect(script).toContain('zIndex < 50');
     expect(script).toContain('touchesFullscreenTree(node)');
-    expect(script).toContain('nodeHasExternalEscape(node)');
+    expect(script).toContain('nodeHasBlockedHost(node)');
+    expect(script).toContain('visibleMediaCoverage() >= 0.20');
+    expect(script).toContain('coverage >= 0.25');
     expect(script).toContain('removeLikelyAdOverlay(anchor)');
   });
 
