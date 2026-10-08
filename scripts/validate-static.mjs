@@ -108,9 +108,22 @@ expect(
   appSource.includes("showNotice('Mode interaction · appuie OK pour cliquer')"),
   'Embedded activation handoff must give the user a short interaction hint.',
 );
+const browserOptionsSource = read('src/ui/BrowserOptions.tsx');
 expect(
-  read('src/ui/BrowserOptions.tsx').includes('Interaction lecteur / vérification'),
+  browserOptionsSource.includes('Interaction lecteur / vérification'),
   'Browser options must expose an explicit native interaction fallback.',
+);
+expect(
+  browserOptionsSource.includes('Passer en mode sélection'),
+  'Browser options must expose pointer-to-selection switching.',
+);
+expect(
+  browserOptionsSource.includes('Passer en mode pointeur'),
+  'Browser options must expose selection-to-pointer switching.',
+);
+expect(
+  appSource.includes('inputEnabled:'),
+  'Pointer mode must preserve state while temporarily disabling browser input for overlays.',
 );
 expect(
   !pointerModeSource.includes('addUserInputListenerCallback(\n        UserInputEventName.Select'),
