@@ -88,12 +88,11 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain("'Vidéo protégée'");
   });
 
-  it('promotes an iframe only when that iframe is the topmost hit target', () => {
+  it('promotes only the actual topmost iframe hit by the pointer', () => {
+    expect(script).toContain('var hit = deepElementAtPointer()');
     expect(script).toContain("hit.tagName === 'IFRAME'");
     expect(script).toContain('frameArea(hit) > 0');
-    expect(script).toContain(
-      'Only promote when the iframe itself is the TOPMOST hit target',
-    );
+    expect(script).toContain('promoteFrame(hit)');
     expect(script).toContain('promoteLargestEmbeddedPlayer');
     expect(script).toContain('kaylane-player-promote');
   });
