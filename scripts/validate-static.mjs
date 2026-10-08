@@ -97,6 +97,14 @@ expect(appSource.includes('allowJavaScriptInBackground={false}'), 'Background Ja
 expect(appSource.includes('domStorageEnabled={true}'), 'DOM storage must remain enabled for normal browsing.');
 expect(appSource.includes('allowsDefaultMediaControl={true}'), 'Default WebView media controls must remain enabled.');
 expect(appSource.includes('thirdPartyCookiesEnabled={true}'), 'Third-party cookies must remain enabled for embedded-player compatibility.');
+expect(
+  appSource.includes('DOFUZ_DESKTOP_USER_AGENT') &&
+    appSource.includes('Chrome/144.0.0.0 Safari/537.36') &&
+    appSource.includes('userAgent={browserUserAgent}') &&
+    appSource.includes("hostname === 'dofuz.com'") &&
+    appSource.includes("hostname.endsWith('.dofuz.com')"),
+  'Dofuz sessions must use the desktop Chromium compatibility user agent for embedded players.',
+);
 expect(appSource.includes('mediaPlaybackRequiresUserAction={false}'), 'HTML5 media compatibility mode must allow playback without an additional WebView gesture gate.');
 expect(appSource.includes('createPlayerCompatibilityScript'), 'Player compatibility bootstrap must remain installed.');
 expect(appSource.includes('FocusManager.focus'), 'Pointer mode must move native TV focus away from WebView/player controls.');

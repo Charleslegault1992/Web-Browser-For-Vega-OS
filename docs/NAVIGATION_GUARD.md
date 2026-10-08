@@ -272,3 +272,19 @@ The page guard now treats the two primary service pages as compatibility-first a
 Promoted third-party player pages keep the stronger playback/modal shield.
 
 This separation is deliberate: primary pages are allowed to initialize sources and players with minimal interference, while aggressive cleanup stays opt-in or moves to the isolated player context.
+
+
+## Dofuz desktop WebView compatibility user agent
+
+Physical Fire TV testing showed Dofuz can render its detail page while the embedded player area itself displays the browser-level “page unavailable” surface.
+
+Vega WebView identifies itself as a mobile embedded WebView by default (including the `wv` / Mobile tokens). Some third-party embedded player hosts behave differently for embedded/mobile WebView clients.
+
+For Dofuz sessions only, Kaylane TV now uses a desktop Chromium 144 user agent through the supported Vega WebView `userAgent` prop. This affects Dofuz and its nested iframe requests in that WebView session without changing Movix behavior.
+
+Security policy is unchanged:
+- HTTPS-only policy remains;
+- mixed content remains `never`;
+- third-party cookies remain enabled;
+- SSL errors still fail closed;
+- no CAPTCHA/auth/DRM bypass is added.

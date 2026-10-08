@@ -39,6 +39,9 @@ const PAGE_BOOTSTRAP_SCRIPT =
   '\n' +
   createPlayerCompatibilityScript();
 const NOTICE_DURATION_MS = 2500;
+const DOFUZ_DESKTOP_USER_AGENT =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
+  '(KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36';
 const SOFT_RETRY_DELAY_MS = 1400;
 const MAX_SOFT_RETRIES = 2;
 
@@ -100,6 +103,17 @@ export const App = () => {
   const [webViewGeneration, setWebViewGeneration] = useState(0);
 
   const source = useMemo(() => ({uri: sourceUrl}), [sourceUrl]);
+
+  const browserUserAgent = useMemo(() => {
+    try {
+      const hostname = new URL(sourceUrl).hostname.toLowerCase();
+      return hostname === 'dofuz.com' || hostname.endsWith('.dofuz.com')
+        ? DOFUZ_DESKTOP_USER_AGENT
+        : undefined;
+    } catch (_) {
+      return undefined;
+    }
+  }, [sourceUrl]);
 
   const injectWebPointerJavaScript = useCallback((script: string) => {
     webViewRef.current?.injectJavaScript(script);
@@ -613,6 +627,7 @@ true;
         style={styles.webView}
         hasTVPreferredFocus={webPointerMode === 'focus'}
         source={source}
+        userAgent={browserUserAgent}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         allowJavaScriptInBackground={false}
