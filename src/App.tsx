@@ -5,7 +5,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import {ActivityIndicator, StyleSheet, View} from 'react-native';
+import {
+  ActivityIndicator,
+  findNodeHandle,
+  StyleSheet,
+  View,
+} from 'react-native';
+import {FocusManager} from '@amazon-devices/react-native-kepler';
 import {WebView} from '@amazon-devices/webview';
 
 import {APP_CONFIG} from './config';
@@ -73,6 +79,7 @@ type WebViewErrorEvent = {
 
 export const App = () => {
   const webViewRef = useRef<React.ElementRef<typeof WebView> | null>(null);
+  const pointerCaptureRef = useRef<React.ElementRef<typeof View> | null>(null);
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const softRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const softRetryCountRef = useRef(0);
@@ -94,10 +101,45 @@ export const App = () => {
     webViewRef.current?.injectJavaScript(script);
   }, []);
 
-  const {syncMode: syncWebPointerMode} = useWebPointerMode({
+  const {
+    mode: webPointerMode,
+    syncMode: syncWebPointerMode,
+  } = useWebPointerMode({
     active: surface === 'browser' && !optionsOpen,
     injectJavaScript: injectWebPointerJavaScript,
   });
+
+  const focusBrowserInputTarget = useCallback(() => {
+    const target =
+      webPointerMode === 'pointer'
+        ? pointerCaptureRef.current
+        : webViewRef.current;
+    const handle = target ? findNodeHandle(target) : null;
+
+    if (handle) {
+      FocusManager.focus(handle);
+    }
+  }, [webPointerMode]);
+
+  useEffect(() => {
+    if (
+      surface !== 'browser' ||
+      optionsOpen ||
+      fatalError !== null
+    ) {
+      return;
+    }
+
+    const timer = setTimeout(focusBrowserInputTarget, 120);
+    return () => clearTimeout(timer);
+  }, [
+    fatalError,
+    focusBrowserInputTarget,
+    optionsOpen,
+    surface,
+    webPointerMode,
+    webViewGeneration,
+  ]);
 
   const toggleOptions = useCallback(() => {
     setOptionsOpen(previous => !previous);
@@ -378,7 +420,7 @@ export const App = () => {
         key={webViewGeneration}
         ref={webViewRef}
         style={styles.webView}
-        hasTVPreferredFocus={true}
+        hasTVPreferredFocus={webPointerMode === 'focus'}
         source={source}
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -424,6 +466,20 @@ export const App = () => {
         }}
       />
 
+      {webPointerMode === 'pointer' &&
+      !optionsOpen &&
+      fatalError === null ? (
+        <View
+          ref={pointerCaptureRef}
+          focusable={true}
+          accessible={false}
+          hasTVPreferredFocus={true}
+          enableSynchronousFocusEvents={true}
+          onBlur={focusBrowserInputTarget}
+          style={styles.pointerInputCapture}
+        />
+      ) : null}
+
       {loading && fatalError === null ? (
         <View pointerEvents="none" style={styles.loadingOverlay}>
           <ActivityIndicator size="large" />
@@ -461,8 +517,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
   },
+  pointerInputCapture: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+    backgroundColor: 'transparent',
+  },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.35)',
