@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     borderColor: '#31415f',
     backgroundColor: '#0d1424',
     paddingHorizontal: 34,
-    paddingVertical: 30,
+    paddingVertical: 22,
   },
   header: {
     flexDirection: 'row',
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#ffffff',
-    fontSize: 34,
+    fontSize: 30,
     lineHeight: 40,
     fontWeight: '900',
     marginTop: 4,
@@ -175,19 +175,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     marginTop: 9,
-    marginBottom: 22,
+    marginBottom: 16,
   },
   actions: {
     gap: 12,
   },
   option: {
-    minHeight: 84,
+    minHeight: 68,
     borderRadius: 17,
     borderWidth: 3,
     borderColor: '#283750',
     backgroundColor: '#111b2e',
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 10,
     justifyContent: 'center',
   },
   optionFocused: {
@@ -197,18 +197,18 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     color: '#ffffff',
-    fontSize: 21,
+    fontSize: 19,
     lineHeight: 26,
     fontWeight: '800',
   },
   optionDescription: {
     color: '#b9c6d9',
-    fontSize: 14,
-    lineHeight: 19,
+    fontSize: 13,
+    lineHeight: 17,
     marginTop: 3,
   },
   tip: {
-    marginTop: 20,
+    marginTop: 14,
     borderRadius: 14,
     backgroundColor: '#151c2d',
     paddingHorizontal: 16,
