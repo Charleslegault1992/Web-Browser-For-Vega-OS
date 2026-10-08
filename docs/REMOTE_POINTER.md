@@ -72,3 +72,17 @@ The switch happens while OK is still held. The same physical hold is ignored unt
 ## Mode badge
 
 The top-right mode badge is no longer persistent. It appears only after a real pointer/selection mode change and fades completely after about 1.3 seconds. Page load, fullscreen entry, and pointer refresh do not show it.
+
+
+## Physical fix: Select / OK ownership
+
+Physical testing after the native focus-capture change showed that registering `UserInputEventName.Select` through UserInputManager suppressed the normal Vega Pressable Select behavior. The pointer still moved, but short OK no longer clicked.
+
+Pointer mode now splits responsibilities:
+- UserInputManager overrides only D-pad directions so player spatial focus cannot move in parallel;
+- the transparent native focus-capture surface is a Vega/React Native `Pressable`;
+- short OK is handled by the Pressable and calls the injected pointer activation API;
+- long OK is handled by the same Pressable after 700 ms and switches to Selection mode;
+- Selection mode still uses TVEventHandler observation for long OK back to Pointer mode without replacing the player's normal short-OK behavior.
+
+This matches Vega guidance: Pressable is the normal TV Select surface, while UserInputManager overrides platform behavior for keys it registers.
