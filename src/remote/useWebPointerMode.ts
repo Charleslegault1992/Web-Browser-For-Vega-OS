@@ -26,16 +26,8 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
   const addUserInputListenerCallback = useAddUserInputListenerCallback();
   const [mode, setModeState] = useState<WebPointerMode>('pointer');
   const modeRef = useRef<WebPointerMode>('pointer');
-  const pointerHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const focusHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreSelectUntilReleaseRef = useRef(false);
-
-  const clearPointerHold = useCallback(() => {
-    if (pointerHoldTimerRef.current !== null) {
-      clearTimeout(pointerHoldTimerRef.current);
-      pointerHoldTimerRef.current = null;
-    }
-  }, []);
 
   const clearFocusHold = useCallback(() => {
     if (focusHoldTimerRef.current !== null) {
@@ -65,6 +57,14 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
     },
     [injectPointerApi],
   );
+
+  const activatePointer = useCallback(() => {
+    if (modeRef.current !== 'pointer') {
+      return;
+    }
+
+    injectPointerApi('window.__KAYLANE_TV_POINTER_API__.activate()');
+  }, [injectPointerApi]);
 
   const syncMode = useCallback(() => {
     injectPointerApi(
@@ -109,10 +109,12 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
 
   useEffect(() => {
     if (!active || mode !== 'pointer') {
-      clearPointerHold();
       return;
     }
 
+    // Only override D-pad directions here. Select is intentionally left to the
+    // native Pressable focus-capture surface so OK/long-OK keep standard Vega
+    // press semantics instead of being swallowed by UserInputManager.
     const subscriptions = directionMap.map(([eventName, key]) =>
       addUserInputListenerCallback(eventName, (event: UserInputEvent) => {
         injectPointerApi(
@@ -124,44 +126,7 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
       }),
     );
 
-    subscriptions.push(
-      addUserInputListenerCallback(
-        UserInputEventName.Select,
-        (event: UserInputEvent) => {
-          if (ignoreSelectUntilReleaseRef.current) {
-            if (event.phase === 'RELEASED') {
-              ignoreSelectUntilReleaseRef.current = false;
-            }
-            return true;
-          }
-
-          if (event.phase === 'PRESSED') {
-            if (pointerHoldTimerRef.current === null) {
-              pointerHoldTimerRef.current = setTimeout(() => {
-                pointerHoldTimerRef.current = null;
-                ignoreSelectUntilReleaseRef.current = true;
-                setMode('focus');
-              }, HOLD_TO_TOGGLE_MS);
-            }
-            return true;
-          }
-
-          if (event.phase === 'RELEASED') {
-            const wasShortPress = pointerHoldTimerRef.current !== null;
-            clearPointerHold();
-
-            if (wasShortPress) {
-              injectPointerApi('window.__KAYLANE_TV_POINTER_API__.activate()');
-            }
-          }
-
-          return true;
-        },
-      ),
-    );
-
     return () => {
-      clearPointerHold();
       subscriptions.forEach(subscription => subscription.remove());
       directionMap.forEach(([, key]) => {
         injectPointerApi(
@@ -174,29 +139,25 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
   }, [
     active,
     addUserInputListenerCallback,
-    clearPointerHold,
     injectPointerApi,
     mode,
-    setMode,
   ]);
 
   useEffect(() => {
     if (!active) {
-      clearPointerHold();
       clearFocusHold();
       ignoreSelectUntilReleaseRef.current = false;
       modeRef.current = 'pointer';
       setModeState('pointer');
     }
-  }, [active, clearFocusHold, clearPointerHold]);
+  }, [active, clearFocusHold]);
 
   useEffect(
     () => () => {
-      clearPointerHold();
       clearFocusHold();
     },
-    [clearFocusHold, clearPointerHold],
+    [clearFocusHold],
   );
 
-  return {mode, setMode, syncMode};
+  return {activatePointer, mode, setMode, syncMode};
 };
