@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 7 }),
+    value: Object.freeze({ version: 8 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -22,6 +22,7 @@ export const createPageGuardScript = (): string => {
 
   var BLOCKED_HOSTS = ${blockedHosts};
   var PRIMARY_HOSTS = ${primaryHosts};
+  var allowedPlayerNavigation = null;
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -58,6 +59,37 @@ export const createPageGuardScript = (): string => {
     var parsed = parseHttpsDestination(url);
     return Boolean(
       parsed && matchesAnyHost(parsed.hostname, BLOCKED_HOSTS)
+    );
+  }
+
+  function allowPlayerNavigation(url) {
+    var parsed = parseHttpsDestination(url);
+
+    if (!parsed || isBlockedHost(parsed.href)) {
+      return false;
+    }
+
+    allowedPlayerNavigation = {
+      href: parsed.href,
+      expiresAt: Date.now() + 6000
+    };
+
+    return true;
+  }
+
+  function isAllowedPlayerNavigation(url) {
+    if (!allowedPlayerNavigation) {
+      return false;
+    }
+
+    if (Date.now() > allowedPlayerNavigation.expiresAt) {
+      allowedPlayerNavigation = null;
+      return false;
+    }
+
+    var parsed = parseHttpsDestination(url);
+    return Boolean(
+      parsed && parsed.href === allowedPlayerNavigation.href
     );
   }
 
@@ -112,6 +144,10 @@ export const createPageGuardScript = (): string => {
 
     var destination = parseHttpsDestination(url);
     if (!destination) {
+      return false;
+    }
+
+    if (isAllowedPlayerNavigation(destination.href)) {
       return false;
     }
 
@@ -467,6 +503,17 @@ export const createPageGuardScript = (): string => {
       return nativeFormSubmit.apply(this, arguments);
     };
   }
+
+  try {
+    Object.defineProperty(window, '__KAYLANE_TV_GUARD_API__', {
+      value: Object.freeze({
+        allowPlayerNavigation: allowPlayerNavigation
+      }),
+      configurable: false,
+      enumerable: false,
+      writable: false
+    });
+  } catch (_) {}
 
   function cleanIframe(frame) {
     if (frame && frame.src && isBlockedHost(frame.src)) {
