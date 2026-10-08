@@ -1,10 +1,10 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 
 import {resolvePreferredDestinationIndex} from './homeFocusPolicy';
 import {
   KAYLANE_LOGO,
-  KAYLANE_MEMORIES_GRID,
+  KAYLANE_SLIDES,
 } from './kaylaneMemories';
 
 export type HomeDestination = {
@@ -24,7 +24,7 @@ export const DEFAULT_HOME_DESTINATIONS: readonly HomeDestination[] = [
   {
     id: 'dofuz',
     label: 'Dofuz',
-    url: 'https://dofuz.com/',
+    url: 'https://dofuz.com/xoitsomxvna96/home/dofuz',
     description: 'Films et séries',
   },
 ];
@@ -76,6 +76,49 @@ const DestinationCard = ({
   );
 };
 
+const MemorySlideshow = () => {
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  useEffect(() => {
+    if (KAYLANE_SLIDES.length < 2) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setSlideIndex(previous => (previous + 1) % KAYLANE_SLIDES.length);
+    }, 5500);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <View style={styles.slideshowCard}>
+      <Image
+        key={slideIndex}
+        source={KAYLANE_SLIDES[slideIndex]}
+        resizeMode="cover"
+        style={styles.slideshowImage}
+      />
+
+      <View style={styles.slideshowShade} />
+
+      <View style={styles.slideshowCopy}>
+        <Text style={styles.slideshowTitle}>Nos souvenirs ♥</Text>
+        <Text style={styles.slideshowText}>Quelques beaux moments avec toi.</Text>
+      </View>
+
+      <View style={styles.dots}>
+        {KAYLANE_SLIDES.map((_, index) => (
+          <View
+            key={String(index)}
+            style={[styles.dot, index === slideIndex && styles.dotActive]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+};
+
 type Props = {
   onOpen: (url: string) => void;
   destinations?: readonly HomeDestination[];
@@ -91,8 +134,6 @@ export const BrowserHome = ({
     destinations,
     preferredUrl,
   );
-  const [memoriesOpen, setMemoriesOpen] = useState(false);
-  const [memoriesFocused, setMemoriesFocused] = useState(false);
 
   return (
     <View style={styles.container}>
@@ -124,30 +165,7 @@ export const BrowserHome = ({
       </View>
 
       <View style={styles.bottomRow}>
-        <Pressable
-          enableSynchronousFocusEvents={true}
-          onFocus={() => setMemoriesFocused(true)}
-          onBlur={() => setMemoriesFocused(false)}
-          onPress={() => setMemoriesOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Ouvrir nos souvenirs"
-          style={[
-            styles.memoriesCard,
-            memoriesFocused && styles.memoriesCardFocused,
-          ]}>
-          <Image
-            source={KAYLANE_MEMORIES_GRID}
-            resizeMode="cover"
-            style={styles.memoriesImage}
-          />
-          <View style={styles.memoriesLabel}>
-            <View>
-              <Text style={styles.memoriesTitle}>Nos souvenirs ♥</Text>
-              <Text style={styles.memoriesText}>OK pour voir les photos</Text>
-            </View>
-            <Text style={styles.memoriesArrow}>›</Text>
-          </View>
-        </Pressable>
+        <MemorySlideshow />
 
         <View style={styles.lovePanel}>
           <View style={styles.loveCardPrimary}>
@@ -165,26 +183,6 @@ export const BrowserHome = ({
       </View>
 
       <Text style={styles.footer}>Kaylane TV · Fait avec amour</Text>
-
-      {memoriesOpen ? (
-        <Pressable
-          hasTVPreferredFocus={true}
-          enableSynchronousFocusEvents={true}
-          onPress={() => setMemoriesOpen(false)}
-          accessibilityRole="button"
-          accessibilityLabel="Fermer nos souvenirs"
-          style={styles.memoriesOverlay}>
-          <Image
-            source={KAYLANE_MEMORIES_GRID}
-            resizeMode="contain"
-            style={styles.memoriesOverlayImage}
-          />
-          <View style={styles.memoriesOverlayHeader}>
-            <Text style={styles.memoriesOverlayTitle}>Nos souvenirs ♥</Text>
-            <Text style={styles.memoriesOverlayHint}>OK pour fermer</Text>
-          </View>
-        </Pressable>
-      ) : null}
     </View>
   );
 };
@@ -324,50 +322,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 18,
   },
-  memoriesCard: {
+  slideshowCard: {
     flex: 1.35,
     overflow: 'hidden',
     borderRadius: 21,
-    borderWidth: 3,
+    borderWidth: 1,
     borderColor: '#293854',
     backgroundColor: '#0d1424',
   },
-  memoriesCardFocused: {
-    borderColor: '#ffffff',
-  },
-  memoriesImage: {
+  slideshowImage: {
     width: '100%',
     height: '100%',
   },
-  memoriesLabel: {
+  slideshowShade: {
     position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 13,
-    minHeight: 62,
-    borderRadius: 15,
-    backgroundColor: 'rgba(5, 9, 21, 0.88)',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '42%',
+    backgroundColor: 'rgba(5, 9, 21, 0.62)',
   },
-  memoriesTitle: {
+  slideshowCopy: {
+    position: 'absolute',
+    left: 18,
+    bottom: 17,
+  },
+  slideshowTitle: {
     color: '#ffffff',
-    fontSize: 19,
-    lineHeight: 23,
+    fontSize: 22,
+    lineHeight: 27,
     fontWeight: '900',
   },
-  memoriesText: {
-    color: '#cdd7e7',
-    fontSize: 13,
-    lineHeight: 17,
-    marginTop: 2,
+  slideshowText: {
+    color: '#d8e0ed',
+    fontSize: 14,
+    lineHeight: 18,
+    marginTop: 3,
   },
-  memoriesArrow: {
-    color: '#ffffff',
-    fontSize: 32,
-    marginLeft: 'auto',
+  dots: {
+    position: 'absolute',
+    right: 18,
+    bottom: 19,
+    flexDirection: 'row',
+    gap: 7,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.35)',
+  },
+  dotActive: {
+    width: 22,
+    backgroundColor: '#ffffff',
   },
   lovePanel: {
     flex: 0.85,
@@ -429,40 +436,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     marginTop: 8,
-  },
-  memoriesOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 100,
-    backgroundColor: '#040711',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 34,
-  },
-  memoriesOverlayImage: {
-    width: '100%',
-    height: '100%',
-  },
-  memoriesOverlayHeader: {
-    position: 'absolute',
-    left: 44,
-    right: 44,
-    top: 34,
-    height: 58,
-    borderRadius: 16,
-    backgroundColor: 'rgba(5,9,21,0.88)',
-    paddingHorizontal: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  memoriesOverlayTitle: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '900',
-  },
-  memoriesOverlayHint: {
-    marginLeft: 'auto',
-    color: '#d9e1ef',
-    fontSize: 16,
-    fontWeight: '700',
   },
 });
