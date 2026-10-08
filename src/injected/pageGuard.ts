@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 11 }),
+    value: Object.freeze({ version: 12 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -27,6 +27,12 @@ export const createPageGuardScript = (): string => {
   var PLAYBACK_SHIELD_MS = 20000;
   var MAX_MODAL_SCAN = 40;
   var MAX_ADDED_NODE_SCAN = 60;
+  var TRUSTED_VERIFICATION_HOSTS = [
+    'challenges.cloudflare.com',
+    'www.recaptcha.net',
+    'recaptcha.net',
+    'hcaptcha.com'
+  ];
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -345,6 +351,25 @@ export const createPageGuardScript = (): string => {
     });
   }
 
+  function isTrustedVerificationUrl(url) {
+    var parsed = parseHttpsDestination(url);
+
+    if (!parsed) {
+      return false;
+    }
+
+    if (
+      hostMatchesRule(parsed.hostname, 'www.google.com') &&
+      parsed.pathname.indexOf('/recaptcha/') !== -1
+    ) {
+      return true;
+    }
+
+    return TRUSTED_VERIFICATION_HOSTS.some(function (rule) {
+      return hostMatchesRule(parsed.hostname, rule);
+    });
+  }
+
   function isVerificationSurface(node) {
     var current = node;
     var depth = 0;
@@ -354,17 +379,179 @@ export const createPageGuardScript = (): string => {
 
       if (
         hasAnyToken(descriptor, [
-          'captcha',
+          'g-recaptcha',
           'recaptcha',
+          'h-captcha',
           'hcaptcha',
-          'turnstile',
-          'cloudflare',
-          'challenge',
-          'verify',
-          'verification',
-          'human'
+          'cf-turnstile',
+          'turnstile'
         ])
       ) {
+        return true;
+      }
+
+      if (current.querySelectorAll) {
+        var frames = current.querySelectorAll('iframe[src]');
+
+        for (var index = 0; index < frames.length; index += 1) {
+          if (isTrustedVerificationUrl(candidateUrl(frames[index]))) {
+            return true;
+          }
+        }
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
+  function normalizedNodeText(node) {
+    if (!node || node.nodeType !== 1) {
+      return '';
+    }
+
+    try {
+      return String(node.textContent || '')
+        .replace(/\\s+/g, ' ')
+        .trim()
+        .toLowerCase()
+        .slice(0, 900);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function looksLikeFakeVerificationAd(node) {
+    if (!node || node.nodeType !== 1 || isVerificationSurface(node)) {
+      return false;
+    }
+
+    var text = normalizedNodeText(node);
+
+    if (!text) {
+      return false;
+    }
+
+    var qrLanguage =
+      (text.indexOf('qr') !== -1 && text.indexOf('scan') !== -1) ||
+      text.indexOf('scan the qr') !== -1 ||
+      text.indexOf('scan qr') !== -1;
+
+    var fakeHumanLanguage =
+      text.indexOf('not a robot') !== -1 ||
+      text.indexOf("you're not a robot") !== -1 ||
+      text.indexOf('confirm you') !== -1 ||
+      text.indexOf('confirm that you') !== -1;
+
+    var phoneLanguage =
+      text.indexOf('your phone') !== -1 ||
+      text.indexOf('phone') !== -1;
+
+    return qrLanguage && (fakeHumanLanguage || phoneLanguage);
+  }
+
+  function hasCloseControl(node) {
+    if (!node || !node.querySelectorAll) {
+      return false;
+    }
+
+    var controls = node.querySelectorAll(
+      'button,a,[role="button"],[aria-label]'
+    );
+
+    for (
+      var index = 0;
+      index < controls.length && index < 20;
+      index += 1
+    ) {
+      var control = controls[index];
+      var text = '';
+
+      try {
+        text = (
+          String(control.textContent || '') +
+          ' ' +
+          String(control.getAttribute('aria-label') || '') +
+          ' ' +
+          String(control.getAttribute('title') || '')
+        )
+          .trim()
+          .toLowerCase();
+      } catch (_) {}
+
+      if (
+        text === 'x' ||
+        text === '×' ||
+        text.indexOf('close') !== -1 ||
+        text.indexOf('fermer') !== -1
+      ) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  function isObviousStandaloneAdModal(node) {
+    if (
+      !isTopDocument() ||
+      !node ||
+      node.nodeType !== 1 ||
+      node === document.body ||
+      node === document.documentElement ||
+      touchesFullscreenTree(node) ||
+      isVerificationSurface(node) ||
+      isSourceSelectionSurface(node)
+    ) {
+      return false;
+    }
+
+    if (looksLikeFakeVerificationAd(node)) {
+      return true;
+    }
+
+    var style;
+
+    try {
+      style = window.getComputedStyle(node);
+    } catch (_) {
+      return false;
+    }
+
+    var position = String(style.position || '').toLowerCase();
+    var coverage = elementCoverage(node);
+
+    if (
+      coverage < 0.01 ||
+      coverage > 0.80 ||
+      (position !== 'fixed' &&
+        position !== 'sticky' &&
+        position !== 'absolute')
+    ) {
+      return false;
+    }
+
+    return (
+      hasCloseControl(node) &&
+      (nodeHasBlockedHost(node) || nodeHasExternalEscape(node))
+    );
+  }
+
+  function removeObviousStandaloneAdModal(node) {
+    var current = node;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 6
+    ) {
+      if (isObviousStandaloneAdModal(current)) {
+        current.remove();
+        restorePageAfterModalRemoval();
         return true;
       }
 
@@ -1149,6 +1336,10 @@ export const createPageGuardScript = (): string => {
       return;
     }
 
+    if (removeObviousStandaloneAdModal(node)) {
+      return;
+    }
+
     if (aggressive === true && sweepAddedOverlayTree(node) > 0) {
       return;
     }
@@ -1176,6 +1367,9 @@ export const createPageGuardScript = (): string => {
   }
 
   function cleanInitialDocument() {
+    document.querySelectorAll(
+      'div,section,aside,dialog,[role="dialog"],[aria-modal="true"]'
+    ).forEach(removeObviousStandaloneAdModal);
     sweepPlaybackModals(document);
     document.querySelectorAll('iframe[src]').forEach(cleanIframe);
     document.querySelectorAll('a[href],iframe[src]').forEach(function (candidate) {
