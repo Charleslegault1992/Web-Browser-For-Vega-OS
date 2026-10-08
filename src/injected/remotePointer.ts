@@ -10,7 +10,7 @@ export const createRemotePointerScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 4 }),
+    value: Object.freeze({ version: 5 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -18,10 +18,13 @@ export const createRemotePointerScript = (): string => {
 
   var BLOCKED_HOSTS = ${blockedHosts};
   var SIZE = 30;
-  var ACCELERATION = 3000;
-  var MAX_SPEED = 1050;
-  var FRICTION = 9;
-  var EDGE_SCROLL_SPEED = 760;
+  var PRECISION_NUDGE = 7;
+  var PRECISION_SPEED = 120;
+  var PRECISION_HOLD_MS = 170;
+  var ACCELERATION = 1450;
+  var MAX_SPEED = 650;
+  var FRICTION = 18;
+  var EDGE_SCROLL_SPEED = 560;
   var x = Math.max(SIZE, Math.round(window.innerWidth / 2));
   var y = Math.max(SIZE, Math.round(window.innerHeight / 2));
   var velocityX = 0;
@@ -38,6 +41,12 @@ export const createRemotePointerScript = (): string => {
     ArrowRight: false,
     ArrowUp: false,
     ArrowDown: false
+  };
+  var pressedAt = {
+    ArrowLeft: 0,
+    ArrowRight: 0,
+    ArrowUp: 0,
+    ArrowDown: 0
   };
 
   function clamp(value, min, max) {
@@ -256,15 +265,32 @@ export const createRemotePointerScript = (): string => {
     return (keys[positiveKey] ? 1 : 0) - (keys[negativeKey] ? 1 : 0);
   }
 
-  function approachVelocity(current, axis, dt) {
+  function axisHeldMs(negativeKey, positiveKey, now) {
+    var key =
+      keys[positiveKey] ? positiveKey : keys[negativeKey] ? negativeKey : null;
+
+    if (!key || !pressedAt[key]) {
+      return 0;
+    }
+
+    return Math.max(0, now - pressedAt[key]);
+  }
+
+  function approachVelocity(current, axis, heldMs, dt) {
     if (axis !== 0) {
+      if (heldMs < PRECISION_HOLD_MS) {
+        var target = axis * PRECISION_SPEED;
+        var response = Math.min(1, dt * 22);
+        return current + (target - current) * response;
+      }
+
       current += axis * ACCELERATION * dt;
       return clamp(current, -MAX_SPEED, MAX_SPEED);
     }
 
     var decay = Math.exp(-FRICTION * dt);
     var next = current * decay;
-    return Math.abs(next) < 8 ? 0 : next;
+    return Math.abs(next) < 5 ? 0 : next;
   }
 
   function anyDirectionHeld() {
@@ -281,6 +307,10 @@ export const createRemotePointerScript = (): string => {
     keys.ArrowRight = false;
     keys.ArrowUp = false;
     keys.ArrowDown = false;
+    pressedAt.ArrowLeft = 0;
+    pressedAt.ArrowRight = 0;
+    pressedAt.ArrowUp = 0;
+    pressedAt.ArrowDown = 0;
     velocityX = 0;
     velocityY = 0;
     lastFrameAt = 0;
@@ -306,8 +336,11 @@ export const createRemotePointerScript = (): string => {
     var axisX = activeAxis('ArrowLeft', 'ArrowRight');
     var axisY = activeAxis('ArrowUp', 'ArrowDown');
 
-    velocityX = approachVelocity(velocityX, axisX, dt);
-    velocityY = approachVelocity(velocityY, axisY, dt);
+    var heldX = axisHeldMs('ArrowLeft', 'ArrowRight', now);
+    var heldY = axisHeldMs('ArrowUp', 'ArrowDown', now);
+
+    velocityX = approachVelocity(velocityX, axisX, heldX, dt);
+    velocityY = approachVelocity(velocityY, axisY, heldY, dt);
 
     var margin = SIZE;
     var width = viewportWidth();
@@ -357,6 +390,23 @@ export const createRemotePointerScript = (): string => {
     }
   }
 
+  function applyPrecisionNudge(key) {
+    if (key === 'ArrowLeft') {
+      x -= PRECISION_NUDGE;
+    } else if (key === 'ArrowRight') {
+      x += PRECISION_NUDGE;
+    } else if (key === 'ArrowUp') {
+      y -= PRECISION_NUDGE;
+    } else if (key === 'ArrowDown') {
+      y += PRECISION_NUDGE;
+    }
+
+    var margin = SIZE;
+    x = clamp(x, margin, viewportWidth() - margin);
+    y = clamp(y, margin, viewportHeight() - margin);
+    render();
+  }
+
   function setDirection(key, pressed) {
     if (!Object.prototype.hasOwnProperty.call(keys, key)) {
       return;
@@ -364,10 +414,33 @@ export const createRemotePointerScript = (): string => {
 
     if (mode !== 'pointer') {
       keys[key] = false;
+      pressedAt[key] = 0;
       return;
     }
 
-    keys[key] = Boolean(pressed);
+    var now = performance.now ? performance.now() : Date.now();
+
+    if (pressed) {
+      if (!keys[key]) {
+        keys[key] = true;
+        pressedAt[key] = now;
+        applyPrecisionNudge(key);
+      }
+    } else {
+      var heldMs = pressedAt[key] ? Math.max(0, now - pressedAt[key]) : 0;
+
+      keys[key] = false;
+      pressedAt[key] = 0;
+
+      if (heldMs < PRECISION_HOLD_MS) {
+        if (key === 'ArrowLeft' || key === 'ArrowRight') {
+          velocityX = 0;
+        } else {
+          velocityY = 0;
+        }
+      }
+    }
+
     ensureAnimation();
   }
 
