@@ -83,7 +83,6 @@ export const App = () => {
   const pointerCaptureRef = useRef<React.ElementRef<typeof Pressable> | null>(
     null,
   );
-  const pointerLongPressRef = useRef(false);
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const softRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const softRetryCountRef = useRef(0);
@@ -364,24 +363,6 @@ export const App = () => {
     (event: {nativeEvent: {data: string}}) => {
       const rawData = event.nativeEvent.data;
 
-      try {
-        const pointerBridgeMessage = JSON.parse(rawData) as {
-          type?: string;
-          reason?: string;
-        };
-
-        if (
-          pointerBridgeMessage.type ===
-          'kaylane-pointer-native-activation'
-        ) {
-          setWebPointerMode('focus');
-          showNotice('Mode interaction · appuie OK pour cliquer');
-          return;
-        }
-      } catch (_) {
-        // Not a pointer bridge message; continue through normal page-guard parsing.
-      }
-
       const message = parsePageGuardMessage(rawData);
 
       if (!message) {
@@ -409,7 +390,7 @@ export const App = () => {
         return;
       }
     },
-    [clearNoticeTimer, setWebPointerMode, showNotice],
+    [clearNoticeTimer],
   );
 
   const handleNavigationRequest = useCallback(
@@ -503,21 +484,9 @@ export const App = () => {
         <Pressable
           ref={pointerCaptureRef}
           hasTVPreferredFocus={true}
-          delayLongPress={700}
           onFocus={focusBrowserInputTarget}
           onBlur={focusBrowserInputTarget}
-          onPressIn={() => {
-            pointerLongPressRef.current = false;
-          }}
-          onLongPress={() => {
-            pointerLongPressRef.current = true;
-            setWebPointerMode('focus');
-          }}
-          onPress={() => {
-            if (!pointerLongPressRef.current) {
-              activatePointer();
-            }
-          }}
+          onPress={activatePointer}
           style={styles.pointerInputCapture}
         />
       ) : null}
@@ -543,11 +512,6 @@ export const App = () => {
                 ? 'Mode pointeur'
                 : 'Mode sélection',
             );
-          }}
-          onInteractionMode={() => {
-            setOptionsOpen(false);
-            setWebPointerMode('focus');
-            showNotice('Mode interaction · utilise les flèches et OK');
           }}
           onRetryPlayer={retryPlayer}
           onReloadPage={reloadCurrentPage}
