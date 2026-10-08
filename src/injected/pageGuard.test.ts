@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 16');
+    expect(script).toContain('version: 17');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -23,11 +23,13 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('replace: function (value)');
   });
 
-  it('blocks explicit new-context links and same-tab external escapes on primary pages', () => {
-    expect(script).toContain('anchorCreatesNewContext');
-    expect(script).toContain('isUnwantedPrimaryPageEscape(href)');
+  it('keeps primary pages compatibility-first while still blocking known ad hosts', () => {
+    expect(script).toContain('function isPrimaryCompatibilityMode()');
+    expect(script).toContain('if (isPrimaryCompatibilityMode())');
     expect(script).toContain('isBlockedHost(href)');
-    expect(script).toContain('preventNavigationDefault(event)');
+    expect(script).toContain('function isPrimaryMediaLink(anchor)');
+    expect(script).toContain('allowPlayerNavigation(mediaDestination.href)');
+    expect(script).toContain('window.location.assign(mediaDestination.href)');
   });
 
   it('allows one explicit promoted-player navigation without opening a second context', () => {
@@ -38,10 +40,11 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('isAllowedPlayerNavigation(destination.href)');
   });
 
-  it('cancels scripted same-tab escapes when the Navigation API is available', () => {
+  it('cancels only known blocked-host Navigation API escapes', () => {
     expect(script).toContain('window.navigation');
     expect(script).toContain("addEventListener('navigate'");
     expect(script).toContain('event.destination.url');
+    expect(script).toContain('isBlockedHost(destinationUrl)');
     expect(script).toContain('event.preventDefault()');
   });
 
@@ -51,9 +54,10 @@ describe('createPageGuardScript', () => {
     expect(script).not.toContain('event.stopPropagation()');
   });
 
-  it('blocks external forms from primary pages but leaves same-site forms native', () => {
+  it('does not blanket-block primary-page form/player flows', () => {
     expect(script).toContain('submitCreatesNewContext');
-    expect(script).toContain('isUnwantedPrimaryPageEscape(action)');
+    expect(script).toContain('!isPrimaryCompatibilityMode()');
+    expect(script).toContain('isBlockedHost(action)');
     expect(script).toContain('return nativeFormSubmit.apply(this, arguments)');
   });
 
@@ -160,13 +164,25 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('isSourceSelectionSurface(node)');
   });
 
-  it('does not arm the aggressive shield from generic player wrappers on primary pages', () => {
+  it('never auto-arms playback cleanup on Movix/Dofuz primary pages', () => {
+    expect(script).toContain('if (!isPrimaryCompatibilityMode())');
     expect(script).toContain("target.closest('video,audio,iframe')");
-    expect(script).toContain("!isPrimaryHost(window.location.hostname)");
     expect(script).toContain(
       "'[class*=\"player\"],[id*=\"player\"],[class*=\"video\"],[id*=\"video\"]'",
     );
-    expect(script).not.toContain("playerTarget || visibleMediaCoverage() >= 0.08");
+    expect(script).toContain(
+      "if (!isPrimaryCompatibilityMode()) {\n        armPlaybackShield(45000);",
+    );
+  });
+
+  it('does not auto-delete primary-page source/player DOM while it initializes', () => {
+    expect(script).toContain('function cleanPrimaryCompatibilityNode(node)');
+    expect(script).toContain('if (isPrimaryCompatibilityMode())');
+    expect(script).toContain('cleanPrimaryCompatibilityNode(node)');
+    expect(script).toContain('cleanPrimaryCompatibilityNode(document.documentElement)');
+    expect(script).toContain(
+      'Compatibility-first primary pages: never auto-delete modal/player/source',
+    );
   });
 
   it('rechecks overlays on bounded DOM/style/modal changes without polling', () => {

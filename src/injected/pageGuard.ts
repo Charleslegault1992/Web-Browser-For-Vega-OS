@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 16 }),
+    value: Object.freeze({ version: 17 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -105,6 +105,10 @@ export const createPageGuardScript = (): string => {
 
   function isPrimaryHost(host) {
     return matchesAnyHost(host, PRIMARY_HOSTS);
+  }
+
+  function isPrimaryCompatibilityMode() {
+    return isPrimaryHost(window.location.hostname);
   }
 
   function targetCreatesNewContext(target) {
@@ -1558,6 +1562,14 @@ export const createPageGuardScript = (): string => {
   }
 
   function armPlaybackShield(durationMs) {
+    // Movix/Dofuz are SPA shells that dynamically build source/player UI.
+    // Automatic DOM cleanup on those primary pages has repeatedly broken
+    // player initialization. Keep them compatibility-first; manual cleanup
+    // and delete-element mode remain available from the browser menu.
+    if (isPrimaryCompatibilityMode()) {
+      return playbackShieldUntil;
+    }
+
     var requested = Number(durationMs);
     var duration =
       Number.isFinite(requested) && requested > 0
@@ -1803,27 +1815,56 @@ export const createPageGuardScript = (): string => {
   // On Movix/Dofuz, the top page should stay on the selected service.
   // Unknown third-party player/media frames are not touched because this test
   // runs against each frame's own location.
+  function isPrimaryMediaLink(anchor) {
+    if (
+      !anchor ||
+      !isPrimaryCompatibilityMode()
+    ) {
+      return false;
+    }
+
+    if (isSourceSelectionSurface(anchor)) {
+      return true;
+    }
+
+    var descriptor = nodeDescriptor(anchor);
+    return hasAnyToken(descriptor, [
+      'source',
+      'server',
+      'serveur',
+      'mirror',
+      'provider',
+      'player',
+      'video',
+      'lecteur',
+      'watch',
+      'play'
+    ]);
+  }
+
   document.addEventListener('click', function (event) {
     var target = event.target;
 
     try {
-      var directMediaTarget =
-        target &&
-        target.closest &&
-        target.closest('video,audio,iframe');
+      if (!isPrimaryCompatibilityMode()) {
+        var directMediaTarget =
+          target &&
+          target.closest &&
+          target.closest('video,audio,iframe');
 
-      var promotedPlayerTarget =
-        !isPrimaryHost(window.location.hostname) &&
-        target &&
-        target.closest &&
-        target.closest(
-          '[class*="player"],[id*="player"],[class*="video"],[id*="video"]'
-        );
+        var promotedPlayerTarget =
+          target &&
+          target.closest &&
+          target.closest(
+            '[class*="player"],[id*="player"],[class*="video"],[id*="video"]'
+          );
 
-      if (directMediaTarget || promotedPlayerTarget) {
-        armPlaybackShield();
+        if (directMediaTarget || promotedPlayerTarget) {
+          armPlaybackShield();
+        }
       }
     } catch (_) {}
+
     if (!target || typeof target.closest !== 'function') {
       return;
     }
@@ -1835,11 +1876,28 @@ export const createPageGuardScript = (): string => {
 
     var href = anchor.href || anchor.getAttribute('href') || '';
 
+    if (isBlockedHost(href)) {
+      preventNavigationDefault(event);
+      removeLikelyAdOverlay(anchor);
+      return;
+    }
+
     if (
-      anchorCreatesNewContext(anchor) ||
-      isBlockedHost(href) ||
-      isUnwantedPrimaryPageEscape(href)
+      anchorCreatesNewContext(anchor) &&
+      isPrimaryMediaLink(anchor)
     ) {
+      var mediaDestination = parseHttpsDestination(href);
+
+      if (mediaDestination) {
+        preventNavigationDefault(event);
+        allowPlayerNavigation(mediaDestination.href);
+        window.location.assign(mediaDestination.href);
+      }
+
+      return;
+    }
+
+    if (anchorCreatesNewContext(anchor)) {
       preventNavigationDefault(event);
       removeLikelyAdOverlay(anchor);
     }
@@ -1859,8 +1917,7 @@ export const createPageGuardScript = (): string => {
 
       if (
         destinationUrl &&
-        (isBlockedHost(destinationUrl) ||
-          isUnwantedPrimaryPageEscape(destinationUrl)) &&
+        isBlockedHost(destinationUrl) &&
         event.cancelable
       ) {
         event.preventDefault();
@@ -1871,7 +1928,9 @@ export const createPageGuardScript = (): string => {
   document.addEventListener(
     'play',
     function () {
-      armPlaybackShield(45000);
+      if (!isPrimaryCompatibilityMode()) {
+        armPlaybackShield(45000);
+      }
     },
     true
   );
@@ -1885,9 +1944,9 @@ export const createPageGuardScript = (): string => {
         : window.location.href;
 
     if (
-      submitCreatesNewContext(form, submitter) ||
       isBlockedHost(action) ||
-      isUnwantedPrimaryPageEscape(action)
+      (submitCreatesNewContext(form, submitter) &&
+        !isPrimaryCompatibilityMode())
     ) {
       preventNavigationDefault(event);
     }
@@ -1904,9 +1963,9 @@ export const createPageGuardScript = (): string => {
       var action = this.action || window.location.href;
 
       if (
-        submitCreatesNewContext(this, null) ||
         isBlockedHost(action) ||
-        isUnwantedPrimaryPageEscape(action)
+        (submitCreatesNewContext(this, null) &&
+          !isPrimaryCompatibilityMode())
       ) {
         return undefined;
       }
@@ -1961,8 +2020,39 @@ export const createPageGuardScript = (): string => {
     return false;
   }
 
+  function cleanPrimaryCompatibilityNode(node) {
+    if (!node || node.nodeType !== 1) {
+      return;
+    }
+
+    if (node.tagName === 'IFRAME') {
+      cleanIframe(node);
+      return;
+    }
+
+    if (!node.querySelectorAll) {
+      return;
+    }
+
+    var frames = node.querySelectorAll('iframe[src]');
+    for (
+      var index = 0;
+      index < frames.length && index < 8;
+      index += 1
+    ) {
+      cleanIframe(frames[index]);
+    }
+  }
+
   function cleanNode(node, aggressive) {
     if (!node || node.nodeType !== 1) {
+      return;
+    }
+
+    // Compatibility-first primary pages: never auto-delete modal/player/source
+    // DOM here. Only known blocked/quarantined iframe hosts are eligible.
+    if (isPrimaryCompatibilityMode()) {
+      cleanPrimaryCompatibilityNode(node);
       return;
     }
 
@@ -1974,9 +2064,6 @@ export const createPageGuardScript = (): string => {
       return;
     }
 
-    // Keep primary pages light while they bootstrap. The previous guard did
-    // deep subtree scans on every mutation and could starve Dofuz's SPA render,
-    // leaving the three-dot loader on screen.
     if (!isPlaybackShieldActive()) {
       return;
     }
@@ -2008,6 +2095,11 @@ export const createPageGuardScript = (): string => {
   }
 
   function cleanInitialDocument() {
+    if (isPrimaryCompatibilityMode()) {
+      cleanPrimaryCompatibilityNode(document.documentElement);
+      return;
+    }
+
     if (document.documentElement) {
       sweepAlwaysBlockedModals(document.documentElement);
     }
@@ -2048,6 +2140,19 @@ export const createPageGuardScript = (): string => {
       mutationQueue.size >= MAX_MUTATION_QUEUE
     ) {
       return;
+    }
+
+    if (
+      isPrimaryCompatibilityMode() &&
+      node.tagName !== 'IFRAME'
+    ) {
+      try {
+        if (!node.querySelector || !node.querySelector('iframe[src]')) {
+          return;
+        }
+      } catch (_) {
+        return;
+      }
     }
 
     mutationQueue.add(node);

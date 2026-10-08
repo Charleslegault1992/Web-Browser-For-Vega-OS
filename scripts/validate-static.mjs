@@ -258,9 +258,16 @@ expect(
   'Primary-site source chooser surfaces must be protected from the playback shield without protecting ad/external panels.',
 );
 expect(
-  pageGuardSource.includes("target.closest('video,audio,iframe')") &&
-    pageGuardSource.includes("!isPrimaryHost(window.location.hostname)"),
-  'Primary pages must arm the shield only from real media/iframe interactions, not generic player wrappers.',
+  pageGuardSource.includes('function isPrimaryCompatibilityMode()') &&
+    pageGuardSource.includes('if (!isPrimaryCompatibilityMode())') &&
+    pageGuardSource.includes("target.closest('video,audio,iframe')"),
+  'Primary Movix/Dofuz pages must not auto-arm playback cleanup during player/source initialization.',
+);
+expect(
+  pageGuardSource.includes('function isPrimaryMediaLink(anchor)') &&
+    pageGuardSource.includes('allowPlayerNavigation(mediaDestination.href)') &&
+    pageGuardSource.includes('window.location.assign(mediaDestination.href)'),
+  'Primary media/source links that request a new context must stay in the single WebView.',
 );
 expect(
   pageGuardSource.includes('function sweepAddedOverlayTree(root)') &&
@@ -293,9 +300,17 @@ expect(
   'DOM mutation cleanup must be batched to avoid starving SPA rendering.',
 );
 expect(
-  pageGuardSource.includes('if (!isPlaybackShieldActive())') &&
-    pageGuardSource.includes('Keep primary pages light while they bootstrap'),
-  'Deep playback scans must stay disabled while primary pages bootstrap.',
+  pageGuardSource.includes('function cleanPrimaryCompatibilityNode(node)') &&
+    pageGuardSource.includes(
+      'Compatibility-first primary pages: never auto-delete modal/player/source',
+    ) &&
+    pageGuardSource.includes('cleanPrimaryCompatibilityNode(document.documentElement)'),
+  'Primary pages must avoid automatic DOM deletion and only clean known blocked/quarantined iframes.',
+);
+expect(
+  pageGuardSource.includes('if (isPrimaryCompatibilityMode()) {') &&
+    pageGuardSource.includes('return playbackShieldUntil;'),
+  'Automatic playback shield must stay disabled on Movix/Dofuz primary pages.',
 );
 expect(
   pageGuardSource.includes('function installNonPrimaryModalCssShield()') &&

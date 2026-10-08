@@ -253,3 +253,22 @@ The guard now has an iframe-popup quarantine path:
 - video-shaped iframes (large 16:9-ish surfaces) are protected from generic purge heuristics unless the user explicitly hits their close-corner path.
 
 This remains event-driven: there is no polling timer and no repeated background scan.
+
+
+## Primary-site compatibility mode (Dofuz / Movix)
+
+Physical Fire TV testing showed Dofuz could enter a permanent three-dot loading state on a video page and eventually surface a connection timeout.
+
+The page guard now treats the two primary service pages as compatibility-first application shells:
+
+- automatic playback-modal cleanup is not armed on Movix/Dofuz themselves;
+- MutationObserver cleanup on primary pages is limited to known blocked or already-quarantined iframe hosts;
+- legitimate source/player DOM is never automatically deleted while the page is constructing its player;
+- generic third-party HTTPS navigation is no longer blanket-cancelled by the page guard;
+- known blocked ad hosts remain blocked;
+- source/player links that explicitly request a new browsing context are redirected into the existing single WebView instead of opening a second tab/window;
+- manual **Fermer toutes les fenêtres** and **Supprimer élément : ON** remain available when the user intentionally wants cleanup.
+
+Promoted third-party player pages keep the stronger playback/modal shield.
+
+This separation is deliberate: primary pages are allowed to initialize sources and players with minimal interference, while aggressive cleanup stays opt-in or moves to the isolated player context.
