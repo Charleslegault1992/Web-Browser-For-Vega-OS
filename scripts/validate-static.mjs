@@ -205,28 +205,38 @@ expect(
 );
 expect(
   pageGuardSource.includes('function sweepAddedOverlayTree(root)') &&
-    pageGuardSource.includes('var MAX_ADDED_NODE_SCAN = 60'),
-  'Playback modal shield must keep aggressive added-node scans bounded.',
+    pageGuardSource.includes('var MAX_ADDED_NODE_SCAN = 40') &&
+    pageGuardSource.includes('var MAX_ALWAYS_MODAL_SCAN = 32') &&
+    pageGuardSource.includes('var MAX_MUTATION_QUEUE = 80'),
+  'Modal cleanup must keep both subtree scans and mutation queues bounded.',
 );
 expect(
   pageGuardSource.includes('containsLargePlayerFrame(node)'),
   'Playback modal shield must preserve real large player iframes.',
 );
 expect(
-  pageGuardSource.includes('function isVerificationSurface(node)') &&
-    pageGuardSource.includes('function isTrustedVerificationUrl(url)') &&
-    pageGuardSource.includes("'challenges.cloudflare.com'") &&
-    pageGuardSource.includes("'www.recaptcha.net'") &&
-    pageGuardSource.includes("'hcaptcha.com'") &&
-    pageGuardSource.includes("'cf-turnstile'"),
-  'Playback modal shield must preserve trusted human-verification providers.',
-);
-expect(
-  pageGuardSource.includes('function looksLikeFakeVerificationAd(node)') &&
+  pageGuardSource.includes('function looksLikeVerificationModal(node)') &&
     pageGuardSource.includes("text.indexOf('scan the qr')") &&
     pageGuardSource.includes("text.indexOf('not a robot')") &&
-    pageGuardSource.includes("text.indexOf('your phone')"),
-  'Fake QR robot-check ads must not be mistaken for trusted verification.',
+    pageGuardSource.includes("text.indexOf('verify you')") &&
+    pageGuardSource.includes("text.indexOf('human verification')"),
+  'Robot/human verification overlays must be treated as blocked modals.',
+);
+expect(
+  !pageGuardSource.includes('function isVerificationSurface(node)') &&
+    !pageGuardSource.includes('function isTrustedVerificationUrl(url)'),
+  'No verification modal provider may be exempt from the no-modal policy.',
+);
+expect(
+  pageGuardSource.includes('function queueMutationNode(node)') &&
+    pageGuardSource.includes('function flushMutationQueue()') &&
+    pageGuardSource.includes('window.requestAnimationFrame(flushMutationQueue)'),
+  'DOM mutation cleanup must be batched to avoid starving SPA rendering.',
+);
+expect(
+  pageGuardSource.includes('if (!isPlaybackShieldActive())') &&
+    pageGuardSource.includes('Keep primary pages light while they bootstrap'),
+  'Deep playback scans must stay disabled while primary pages bootstrap.',
 );
 expect(
   pageGuardSource.includes('window.alert = function ()') &&
