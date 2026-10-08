@@ -1,5 +1,10 @@
-import {useEffect, useRef} from 'react';
+import {useCallback, useEffect, useRef} from 'react';
 import {BackHandler} from 'react-native';
+import {
+  UserInputEvent,
+  UserInputEventName,
+  useAddUserInputListenerCallback,
+} from '@amazon-devices/react-native-kepler';
 
 import {
   decideBackAction,
@@ -20,57 +25,84 @@ export const useBrowserBackHandler = (
 ): void => {
   const controllerRef = useRef(controller);
   const lastHandledBackAtRef = useRef<number | null>(null);
+  const addUserInputListenerCallback = useAddUserInputListenerCallback();
 
-  // Keep the listener stable for the lifetime of the mounted shell while
-  // always reading the latest navigation state/callbacks.
   controllerRef.current = controller;
+
+  const handleBack = useCallback((): boolean => {
+    const current = controllerRef.current;
+
+    if (current.isAtHome) {
+      lastHandledBackAtRef.current = null;
+      return false;
+    }
+
+    const now = Date.now();
+
+    if (
+      shouldSuppressRepeatedBackPress(
+        lastHandledBackAtRef.current,
+        now,
+      )
+    ) {
+      return true;
+    }
+
+    lastHandledBackAtRef.current = now;
+
+    const action = decideBackAction({
+      overlayOpen: current.overlayOpen,
+      canGoBack: current.canGoBack,
+      isAtHome: current.isAtHome,
+    });
+
+    switch (action) {
+      case 'dismiss-overlay':
+        current.dismissOverlay();
+        return true;
+      case 'webview-back':
+        current.goBack();
+        return true;
+      case 'go-home':
+        current.goHome();
+        return true;
+      case 'system-default':
+        return false;
+    }
+  }, []);
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
       'hardwareBackPress',
-      () => {
-        const current = controllerRef.current;
-        const action = decideBackAction({
-          overlayOpen: current.overlayOpen,
-          canGoBack: current.canGoBack,
-          isAtHome: current.isAtHome,
-        });
+      handleBack,
+    );
 
-        const now = Date.now();
+    return () => subscription.remove();
+  }, [handleBack]);
 
-        // Fire TV key-repeat can deliver multiple Back events before or just
-        // after React commits the first state transition. Consume that tiny
-        // burst so one press cannot dismiss an overlay, navigate, then exit.
-        if (
-          shouldSuppressRepeatedBackPress(
-            lastHandledBackAtRef.current,
-            now,
-          )
-        ) {
-          return true;
+  useEffect(() => {
+    if (controller.isAtHome) {
+      return;
+    }
+
+    // WebView/fullscreen players can own the platform Back route before
+    // React Native BackHandler gets it. Override Back only while browsing,
+    // then route it through the exact same browser-history policy.
+    const subscription = addUserInputListenerCallback(
+      UserInputEventName.Back,
+      (event: UserInputEvent) => {
+        if (event.phase === 'PRESSED') {
+          handleBack();
         }
 
-        if (action === 'system-default') {
-          lastHandledBackAtRef.current = null;
-          return false;
-        }
-
-        lastHandledBackAtRef.current = now;
-
-        switch (action) {
-          case 'dismiss-overlay':
-            current.dismissOverlay();
-            return true;
-          case 'webview-back':
-            current.goBack();
-            return true;
-          case 'go-home':
-            current.goHome();
-            return true;
-        }
+        return true;
       },
     );
 
     return () => subscription.remove();
-  }, []);
+  }, [
+    addUserInputListenerCallback,
+    controller.isAtHome,
+    handleBack,
+  ]);
 };
