@@ -58,6 +58,8 @@ describe('createRemotePointerScript', () => {
   it('uses hit testing and native element click compatibility', () => {
     expect(script).toContain('document.elementFromPoint(x, y)');
     expect(script).toContain('target.click()');
+    expect(script).toContain('armPlaybackShield()');
+    expect(script).toContain('__KAYLANE_TV_GUARD_API__.armPlaybackShield');
   });
 
   it('promotes a large HTTPS iframe under the pointer instead of fake-clicking across origins', () => {
