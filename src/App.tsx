@@ -8,6 +8,7 @@ import React, {
 import {
   ActivityIndicator,
   findNodeHandle,
+  Pressable,
   StyleSheet,
   View,
 } from 'react-native';
@@ -79,7 +80,10 @@ type WebViewErrorEvent = {
 
 export const App = () => {
   const webViewRef = useRef<React.ElementRef<typeof WebView> | null>(null);
-  const pointerCaptureRef = useRef<React.ElementRef<typeof View> | null>(null);
+  const pointerCaptureRef = useRef<React.ElementRef<typeof Pressable> | null>(
+    null,
+  );
+  const pointerLongPressRef = useRef(false);
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const softRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const softRetryCountRef = useRef(0);
@@ -102,7 +106,9 @@ export const App = () => {
   }, []);
 
   const {
+    activatePointer,
     mode: webPointerMode,
+    setMode: setWebPointerMode,
     syncMode: syncWebPointerMode,
   } = useWebPointerMode({
     active: surface === 'browser' && !optionsOpen,
@@ -470,12 +476,24 @@ export const App = () => {
       {webPointerMode === 'pointer' &&
       !optionsOpen &&
       fatalError === null ? (
-        <View
+        <Pressable
           ref={pointerCaptureRef}
-          focusable={true}
-          accessible={false}
           hasTVPreferredFocus={true}
+          delayLongPress={700}
+          onFocus={focusBrowserInputTarget}
           onBlur={focusBrowserInputTarget}
+          onPressIn={() => {
+            pointerLongPressRef.current = false;
+          }}
+          onLongPress={() => {
+            pointerLongPressRef.current = true;
+            setWebPointerMode('focus');
+          }}
+          onPress={() => {
+            if (!pointerLongPressRef.current) {
+              activatePointer();
+            }
+          }}
           style={styles.pointerInputCapture}
         />
       ) : null}
