@@ -193,8 +193,10 @@ expect(
   pageGuardSource.includes('function isSourceSelectionSurface(node)') &&
     pageGuardSource.includes("'source'") &&
     pageGuardSource.includes("'server'") &&
-    pageGuardSource.includes("'serveur'"),
-  'Primary-site source chooser surfaces must be protected from the playback shield.',
+    pageGuardSource.includes("'serveur'") &&
+    pageGuardSource.includes('!nodeHasBlockedHost(current)') &&
+    pageGuardSource.includes('!nodeHasExternalEscape(current)'),
+  'Primary-site source chooser surfaces must be protected from the playback shield without protecting ad/external panels.',
 );
 expect(
   pageGuardSource.includes("target.closest('video,audio,iframe')") &&
