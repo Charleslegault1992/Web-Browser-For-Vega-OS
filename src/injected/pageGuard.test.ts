@@ -94,11 +94,11 @@ describe('createPageGuardScript', () => {
     expect(script).not.toContain('function isTrustedVerificationUrl(url)');
   });
 
-  it('blocks browser dialogs while playback shield is active', () => {
+  it('blocks browser dialogs globally', () => {
     expect(script).toContain('window.alert = function ()');
     expect(script).toContain('window.confirm = function ()');
     expect(script).toContain('window.prompt = function ()');
-    expect(script).toContain('if (isPlaybackShieldActive())');
+    expect(script).toContain('function installNonPrimaryModalCssShield()');
   });
 
   it('keeps playback cleanup bounded and batches DOM mutations', () => {
