@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 14');
+    expect(script).toContain('version: 15');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -101,14 +101,27 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('function installNonPrimaryModalCssShield()');
   });
 
-  it('exposes manual popup cleanup APIs for remote recovery', () => {
+  it('exposes manual popup cleanup and iframe-quarantine APIs for remote recovery', () => {
     expect(script).toContain('function closePopupAt(clientX, clientY)');
     expect(script).toContain('function closeAllPopups()');
-    expect(script).toContain('function isManualPopupCandidate(node)');
+    expect(script).toContain('function dismissPopupFrameAt(clientX, clientY, forceCloseCorner)');
+    expect(script).toContain('function rememberPopupFrame(frame)');
+    expect(script).toContain('function isQuarantinedPopupFrame(frame)');
+    expect(script).toContain('var quarantinedPopupSignatures = new Set()');
+    expect(script).toContain('popupPurgeUntil');
     expect(script).toContain('closePopupAt: closePopupAt');
+    expect(script).toContain('dismissPopupFrameAt: dismissPopupFrameAt');
     expect(script).toContain('closeAllPopups: closeAllPopups');
-    expect(script).toContain('isSourceSelectionSurface(node)');
-    expect(script).toContain('containsLargePlayerFrame(node)');
+    expect(script).toContain("'iframe[src]'");
+    expect(script).toContain("'iframe[data-src]'");
+  });
+
+  it('preserves real video-shaped player iframes during manual purge', () => {
+    expect(script).toContain('function isLikelyPlayerFrame(frame)');
+    expect(script).toContain('ratio >= 1.35');
+    expect(script).toContain('ratio <= 2.40');
+    expect(script).toContain('coverage >= 0.16');
+    expect(script).toContain('!isLikelyPlayerFrame(frame) && frameOverlayEvidence(frame)');
   });
 
   it('keeps playback cleanup bounded and batches DOM mutations', () => {
