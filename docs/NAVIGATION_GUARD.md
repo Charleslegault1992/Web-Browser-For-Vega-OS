@@ -253,3 +253,21 @@ The guard now has an iframe-popup quarantine path:
 - video-shaped iframes (large 16:9-ish surfaces) are protected from generic purge heuristics unless the user explicitly hits their close-corner path.
 
 This remains event-driven: there is no polling timer and no repeated background scan.
+
+
+## Visual-stack popup removal above the real player
+
+A later Fire TV test showed that semantic popup detection was still insufficient for a QR/robot overlay. The important clue was that Selection mode could focus the real video behind the white popup, proving the popup was a separate visual layer stacked over the actual player.
+
+The guard now uses browser visual stacking rather than class names alone:
+
+- `document.elementsFromPoint(x, y)` inspects the full top-document layer stack at a screen coordinate;
+- if a non-player layer is above a real `video`, player control surface, or large player iframe, that top layer is treated as an obstruction;
+- pointer OK asks the guard to remove that obstruction before trying iframe promotion;
+- iframe overlays are quarantined when removed;
+- **Fermer toutes les fenêtres** performs a bounded 30-point viewport sweep, up to three passes, to find opaque layers above the player even when they have no modal/popup/captcha class or readable text;
+- recurring iframe reinsertion is caught by the existing quarantine + mutation observer path.
+
+For performance, the expensive iframe stack test only runs automatically while playback protection or a manual popup-purge window is active. Dofuz bootstrap does not pay this cost.
+
+This is designed for exactly the case where the parent page cannot inspect the ad iframe's internal X button, but can still see that the iframe is visually stacked above the real player.
