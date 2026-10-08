@@ -3,10 +3,7 @@ import {
   UserInputEvent,
   UserInputEventName,
   useAddUserInputListenerCallback,
-  useTVEventHandler,
 } from '@amazon-devices/react-native-kepler';
-
-const HOLD_TO_TOGGLE_MS = 700;
 
 export type WebPointerMode = 'pointer' | 'focus';
 
@@ -31,15 +28,6 @@ export const useWebPointerMode = ({
   const addUserInputListenerCallback = useAddUserInputListenerCallback();
   const [mode, setModeState] = useState<WebPointerMode>('pointer');
   const modeRef = useRef<WebPointerMode>('pointer');
-  const focusHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const ignoreSelectUntilReleaseRef = useRef(false);
-
-  const clearFocusHold = useCallback(() => {
-    if (focusHoldTimerRef.current !== null) {
-      clearTimeout(focusHoldTimerRef.current);
-      focusHoldTimerRef.current = null;
-    }
-  }, []);
 
   const injectPointerApi = useCallback(
     (expression: string) => {
@@ -80,47 +68,11 @@ export const useWebPointerMode = ({
     injectPointerApi('window.__KAYLANE_TV_POINTER_API__.refresh()');
   }, [injectPointerApi]);
 
-  useTVEventHandler(event => {
-    if (
-      !active ||
-      !inputEnabled ||
-      modeRef.current !== 'focus' ||
-      event.eventType !== 'select'
-    ) {
-      return;
-    }
-
-    if (ignoreSelectUntilReleaseRef.current) {
-      if (event.eventKeyAction === 1) {
-        ignoreSelectUntilReleaseRef.current = false;
-      }
-      return;
-    }
-
-    if (event.eventKeyAction === 0) {
-      if (focusHoldTimerRef.current === null) {
-        focusHoldTimerRef.current = setTimeout(() => {
-          focusHoldTimerRef.current = null;
-          ignoreSelectUntilReleaseRef.current = true;
-          setMode('pointer');
-        }, HOLD_TO_TOGGLE_MS);
-      }
-      return;
-    }
-
-    if (event.eventKeyAction === 1) {
-      clearFocusHold();
-    }
-  });
-
   useEffect(() => {
     if (!active || !inputEnabled || mode !== 'pointer') {
       return;
     }
 
-    // Only override D-pad directions here. Select is intentionally left to the
-    // native Pressable focus-capture surface so OK/long-OK keep standard Vega
-    // press semantics instead of being swallowed by UserInputManager.
     const subscriptions = directionMap.map(([eventName, key]) =>
       addUserInputListenerCallback(eventName, (event: UserInputEvent) => {
         injectPointerApi(
@@ -152,19 +104,10 @@ export const useWebPointerMode = ({
 
   useEffect(() => {
     if (!active) {
-      clearFocusHold();
-      ignoreSelectUntilReleaseRef.current = false;
       modeRef.current = 'pointer';
       setModeState('pointer');
     }
-  }, [active, clearFocusHold]);
-
-  useEffect(
-    () => () => {
-      clearFocusHold();
-    },
-    [clearFocusHold],
-  );
+  }, [active]);
 
   return {activatePointer, mode, setMode, syncMode};
 };
