@@ -170,12 +170,12 @@ export const BrowserHome = ({
         <View style={styles.lovePanel}>
           <View style={styles.loveCardPrimary}>
             <Text style={styles.lovePrimary}>Je t’aime.</Text>
-            <Text style={styles.loveSecondary}>Tu es l’amour de ma vie.</Text>
+            <Text style={styles.loveSecondary}>#TEAMDEFEUX</Text>
           </View>
 
           <View style={styles.loveCardSmall}>
             <Text style={styles.smallHeart}>♥</Text>
-            <Text style={styles.loveSmall}>Je suis fier de toi.</Text>
+            <Text style={styles.loveSmall}>Je suis fucking fier de toi.</Text>
           </View>
 
           <Text style={styles.signature}>— Charles ♥</Text>
