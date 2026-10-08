@@ -3,7 +3,7 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and exposes the v3 pointer API', () => {
+  it('is idempotent and exposes the v4 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
     expect(script).toContain('version: 4');
     expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
@@ -56,7 +56,7 @@ describe('createRemotePointerScript', () => {
 
   it('promotes a large HTTPS iframe under the pointer instead of fake-clicking across origins', () => {
     expect(script).toContain('function embeddedPlayerAtPointer()');
-    expect(script).toContain('document.elementsFromPoint(x, y)');
+    expect(script).toMatch(/document\s*\.\s*elementsFromPoint\(x, y\)/);
     expect(script).toContain("element.tagName === 'IFRAME'");
     expect(script).toContain('frameArea(element) > 0');
     expect(script).toContain('kaylane-player-promote');
