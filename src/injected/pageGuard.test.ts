@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 12');
+    expect(script).toContain('version: 13');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -59,7 +59,7 @@ describe('createPageGuardScript', () => {
 
   it('does not globally block third-party frames/media hosts', () => {
     expect(script).toContain('isPrimaryHost(window.location.hostname)');
-    expect(script).toContain("node.querySelectorAll('iframe[src]').forEach(cleanIframe)");
+    expect(script).toContain("var frames = node.querySelectorAll('iframe[src]')");
     expect(script).not.toContain("querySelectorAll('iframe').forEach(function");
   });
 
@@ -82,26 +82,16 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('isPlaybackShieldActive()');
   });
 
-  it('suppresses modal-like overlays while preserving only trusted verification surfaces', () => {
+  it('blocks all modal overlays including robot / human verification prompts', () => {
     expect(script).toContain('function isLikelyPlaybackModal(node, aggressive)');
-    expect(script).toContain('function isVerificationSurface(node)');
-    expect(script).toContain('function isTrustedVerificationUrl(url)');
-    expect(script).toContain("'challenges.cloudflare.com'");
-    expect(script).toContain("'www.recaptcha.net'");
-    expect(script).toContain("'hcaptcha.com'");
-    expect(script).toContain("'cf-turnstile'");
-    expect(script).toContain("node.getAttribute('aria-modal') === 'true'");
-    expect(script).toContain('coverage >= 0.012');
-    expect(script).toContain('aggressive === true');
-  });
-
-  it('removes fake QR robot-check ads instead of preserving generic verify/human text', () => {
-    expect(script).toContain('function looksLikeFakeVerificationAd(node)');
+    expect(script).toContain('function looksLikeVerificationModal(node)');
     expect(script).toContain("text.indexOf('scan the qr')");
     expect(script).toContain("text.indexOf('not a robot')");
-    expect(script).toContain("text.indexOf('your phone')");
+    expect(script).toContain("text.indexOf('verify you')");
+    expect(script).toContain("text.indexOf('human verification')");
     expect(script).toContain('function removeObviousStandaloneAdModal(node)');
-    expect(script).not.toContain("'verification',\n          'human'");
+    expect(script).not.toContain('function isVerificationSurface(node)');
+    expect(script).not.toContain('function isTrustedVerificationUrl(url)');
   });
 
   it('blocks browser dialogs while playback shield is active', () => {
@@ -111,12 +101,15 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('if (isPlaybackShieldActive())');
   });
 
-  it('aggressively removes newly-added or newly-shown small playback overlays', () => {
+  it('keeps playback cleanup bounded and batches DOM mutations', () => {
     expect(script).toContain('function sweepAddedOverlayTree(root)');
-    expect(script).toContain('var MAX_ADDED_NODE_SCAN = 60');
-    expect(script).toContain('removePlaybackModal(root, true)');
-    expect(script).toContain('cleanNode(mutation.target, true)');
-    expect(script).toContain('cleanNode(node, true)');
+    expect(script).toContain('var MAX_ADDED_NODE_SCAN = 40');
+    expect(script).toContain('var MAX_ALWAYS_MODAL_SCAN = 32');
+    expect(script).toContain('var MAX_MUTATION_QUEUE = 80');
+    expect(script).toContain('function queueMutationNode(node)');
+    expect(script).toContain('function flushMutationQueue()');
+    expect(script).toContain('window.requestAnimationFrame(flushMutationQueue)');
+    expect(script).toContain('mutation.addedNodes.forEach(queueMutationNode)');
     expect(script).toContain('containsLargePlayerFrame(node)');
   });
 
