@@ -2047,7 +2047,8 @@ export const createPageGuardScript = (): string => {
 
     if (
       isQuarantinedPopupFrame(frame) ||
-      frameCoversUnderlyingPlayer(frame) ||
+      ((popupPurgeActive() || isPlaybackShieldActive()) &&
+        frameCoversUnderlyingPlayer(frame)) ||
       (frame.src && isBlockedHost(frame.src))
     ) {
       frame.remove();
