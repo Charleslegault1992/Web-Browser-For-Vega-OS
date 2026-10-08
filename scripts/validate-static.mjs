@@ -165,10 +165,26 @@ expect(
 );
 expect(
   pageGuardSource.includes('function closePopupAt(clientX, clientY)') &&
+    pageGuardSource.includes('function dismissPopupFrameAt(clientX, clientY, forceCloseCorner)') &&
     pageGuardSource.includes('function closeAllPopups()') &&
     pageGuardSource.includes('closePopupAt: closePopupAt') &&
+    pageGuardSource.includes('dismissPopupFrameAt: dismissPopupFrameAt') &&
     pageGuardSource.includes('closeAllPopups: closeAllPopups'),
-  'Navigation guard must expose manual popup cleanup APIs.',
+  'Navigation guard must expose manual popup cleanup and iframe-dismiss APIs.',
+);
+expect(
+  pageGuardSource.includes('var quarantinedPopupSignatures = new Set()') &&
+    pageGuardSource.includes('function rememberPopupFrame(frame)') &&
+    pageGuardSource.includes('function isQuarantinedPopupFrame(frame)') &&
+    pageGuardSource.includes('popupPurgeUntil'),
+  'Dismissed popup iframes must be quarantined so delayed re-open attempts are removed.',
+);
+expect(
+  pageGuardSource.includes('function isLikelyPlayerFrame(frame)') &&
+    pageGuardSource.includes('ratio >= 1.35') &&
+    pageGuardSource.includes('ratio <= 2.40') &&
+    pageGuardSource.includes('coverage >= 0.16'),
+  'Manual popup cleanup must preserve video-shaped player iframes.',
 );
 expect(
   appSource.includes('kaylane-popup-cleanup') &&
@@ -293,6 +309,13 @@ expect(
     remotePointerSource.includes("hit.tagName === 'IFRAME'") &&
     remotePointerSource.includes('promoteFrame(hit)'),
   'Pointer OK may promote only a topmost iframe, never an iframe hidden under another control.',
+);
+expect(
+  remotePointerSource.includes('function isNearTopRightOfFrame(frame)') &&
+    remotePointerSource.includes('function dismissTopmostPopupFrame(frame)') &&
+    remotePointerSource.includes('__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt') &&
+    remotePointerSource.includes('isNearTopRightOfFrame(hit)'),
+  'Pointer OK on an iframe close corner must dismiss/quarantine the popup instead of isolating it.',
 );
 expect(
   remotePointerSource.includes('function deepElementAtPointer()') &&
