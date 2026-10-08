@@ -474,7 +474,6 @@ export const App = () => {
           focusable={true}
           accessible={false}
           hasTVPreferredFocus={true}
-          enableSynchronousFocusEvents={true}
           onBlur={focusBrowserInputTarget}
           style={styles.pointerInputCapture}
         />
