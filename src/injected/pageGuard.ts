@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 12 }),
+    value: Object.freeze({ version: 13 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -26,13 +26,11 @@ export const createPageGuardScript = (): string => {
   var playbackShieldUntil = 0;
   var PLAYBACK_SHIELD_MS = 20000;
   var MAX_MODAL_SCAN = 40;
-  var MAX_ADDED_NODE_SCAN = 60;
-  var TRUSTED_VERIFICATION_HOSTS = [
-    'challenges.cloudflare.com',
-    'www.recaptcha.net',
-    'recaptcha.net',
-    'hcaptcha.com'
-  ];
+  var MAX_ADDED_NODE_SCAN = 40;
+  var MAX_ALWAYS_MODAL_SCAN = 32;
+  var MAX_MUTATION_QUEUE = 80;
+  var mutationQueue = new Set();
+  var mutationFrame = 0;
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -351,62 +349,6 @@ export const createPageGuardScript = (): string => {
     });
   }
 
-  function isTrustedVerificationUrl(url) {
-    var parsed = parseHttpsDestination(url);
-
-    if (!parsed) {
-      return false;
-    }
-
-    if (
-      hostMatchesRule(parsed.hostname, 'www.google.com') &&
-      parsed.pathname.indexOf('/recaptcha/') !== -1
-    ) {
-      return true;
-    }
-
-    return TRUSTED_VERIFICATION_HOSTS.some(function (rule) {
-      return hostMatchesRule(parsed.hostname, rule);
-    });
-  }
-
-  function isVerificationSurface(node) {
-    var current = node;
-    var depth = 0;
-
-    while (current && depth < 5) {
-      var descriptor = nodeDescriptor(current);
-
-      if (
-        hasAnyToken(descriptor, [
-          'g-recaptcha',
-          'recaptcha',
-          'h-captcha',
-          'hcaptcha',
-          'cf-turnstile',
-          'turnstile'
-        ])
-      ) {
-        return true;
-      }
-
-      if (current.querySelectorAll) {
-        var frames = current.querySelectorAll('iframe[src]');
-
-        for (var index = 0; index < frames.length; index += 1) {
-          if (isTrustedVerificationUrl(candidateUrl(frames[index]))) {
-            return true;
-          }
-        }
-      }
-
-      current = current.parentElement;
-      depth += 1;
-    }
-
-    return false;
-  }
-
   function normalizedNodeText(node) {
     if (!node || node.nodeType !== 1) {
       return '';
@@ -423,8 +365,8 @@ export const createPageGuardScript = (): string => {
     }
   }
 
-  function looksLikeFakeVerificationAd(node) {
-    if (!node || node.nodeType !== 1 || isVerificationSurface(node)) {
+  function looksLikeVerificationModal(node) {
+    if (!node || node.nodeType !== 1) {
       return false;
     }
 
@@ -434,22 +376,24 @@ export const createPageGuardScript = (): string => {
       return false;
     }
 
+    var robotLanguage =
+      text.indexOf('not a robot') !== -1 ||
+      text.indexOf("you're not a robot") !== -1 ||
+      text.indexOf('you are not a robot') !== -1 ||
+      text.indexOf('confirm you') !== -1 ||
+      text.indexOf('confirm that you') !== -1 ||
+      text.indexOf('verify you') !== -1 ||
+      text.indexOf('verify that you') !== -1 ||
+      text.indexOf('verify you are human') !== -1 ||
+      text.indexOf('verify that you are human') !== -1 ||
+      text.indexOf('human verification') !== -1;
+
     var qrLanguage =
       (text.indexOf('qr') !== -1 && text.indexOf('scan') !== -1) ||
       text.indexOf('scan the qr') !== -1 ||
       text.indexOf('scan qr') !== -1;
 
-    var fakeHumanLanguage =
-      text.indexOf('not a robot') !== -1 ||
-      text.indexOf("you're not a robot") !== -1 ||
-      text.indexOf('confirm you') !== -1 ||
-      text.indexOf('confirm that you') !== -1;
-
-    var phoneLanguage =
-      text.indexOf('your phone') !== -1 ||
-      text.indexOf('phone') !== -1;
-
-    return qrLanguage && (fakeHumanLanguage || phoneLanguage);
+    return robotLanguage || qrLanguage;
   }
 
   function hasCloseControl(node) {
@@ -502,13 +446,12 @@ export const createPageGuardScript = (): string => {
       node === document.body ||
       node === document.documentElement ||
       touchesFullscreenTree(node) ||
-      isVerificationSurface(node) ||
       isSourceSelectionSurface(node)
     ) {
       return false;
     }
 
-    if (looksLikeFakeVerificationAd(node)) {
+    if (looksLikeVerificationModal(node)) {
       return true;
     }
 
@@ -745,7 +688,6 @@ export const createPageGuardScript = (): string => {
       node === document.documentElement ||
       node === document.body ||
       touchesFullscreenTree(node) ||
-      isVerificationSurface(node) ||
       isSourceSelectionSurface(node)
     ) {
       return false;
