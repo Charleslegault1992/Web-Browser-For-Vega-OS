@@ -190,6 +190,18 @@ expect(
   'Playback modal shield must aggressively remove small newly-added overlays.',
 );
 expect(
+  pageGuardSource.includes('function isSourceSelectionSurface(node)') &&
+    pageGuardSource.includes("'source'") &&
+    pageGuardSource.includes("'server'") &&
+    pageGuardSource.includes("'serveur'"),
+  'Primary-site source chooser surfaces must be protected from the playback shield.',
+);
+expect(
+  pageGuardSource.includes("target.closest('video,audio,iframe')") &&
+    pageGuardSource.includes("!isPrimaryHost(window.location.hostname)"),
+  'Primary pages must arm the shield only from real media/iframe interactions, not generic player wrappers.',
+);
+expect(
   pageGuardSource.includes('function sweepAddedOverlayTree(root)') &&
     pageGuardSource.includes('var MAX_ADDED_NODE_SCAN = 60'),
   'Playback modal shield must keep aggressive added-node scans bounded.',
