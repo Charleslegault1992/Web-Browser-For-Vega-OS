@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 8 }),
+    value: Object.freeze({ version: 9 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -23,6 +23,9 @@ export const createPageGuardScript = (): string => {
   var BLOCKED_HOSTS = ${blockedHosts};
   var PRIMARY_HOSTS = ${primaryHosts};
   var allowedPlayerNavigation = null;
+  var playbackShieldUntil = 0;
+  var PLAYBACK_SHIELD_MS = 20000;
+  var MAX_MODAL_SCAN = 40;
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -291,6 +294,347 @@ export const createPageGuardScript = (): string => {
     return best;
   }
 
+  function hasActivePlayingMedia() {
+    var media = document.querySelectorAll('video,audio');
+
+    for (var index = 0; index < media.length; index += 1) {
+      var element = media[index];
+
+      try {
+        if (!element.paused && !element.ended && element.readyState >= 2) {
+          return true;
+        }
+      } catch (_) {}
+    }
+
+    return false;
+  }
+
+  function isPlaybackShieldActive() {
+    return Date.now() < playbackShieldUntil || hasActivePlayingMedia();
+  }
+
+  function nodeDescriptor(node) {
+    if (!node || node.nodeType !== 1) {
+      return '';
+    }
+
+    var values = [];
+
+    try {
+      values.push(node.tagName || '');
+      values.push(node.id || '');
+      values.push(
+        typeof node.className === 'string'
+          ? node.className
+          : ''
+      );
+      values.push(node.getAttribute('role') || '');
+      values.push(node.getAttribute('aria-label') || '');
+      values.push(node.getAttribute('data-ad') || '');
+      values.push(node.getAttribute('data-testid') || '');
+    } catch (_) {}
+
+    return values.join(' ').toLowerCase();
+  }
+
+  function hasAnyToken(text, tokens) {
+    return tokens.some(function (token) {
+      return text.indexOf(token) !== -1;
+    });
+  }
+
+  function isVerificationSurface(node) {
+    var current = node;
+    var depth = 0;
+
+    while (current && depth < 5) {
+      var descriptor = nodeDescriptor(current);
+
+      if (
+        hasAnyToken(descriptor, [
+          'captcha',
+          'recaptcha',
+          'hcaptcha',
+          'turnstile',
+          'cloudflare',
+          'challenge',
+          'verify',
+          'verification',
+          'human'
+        ])
+      ) {
+        return true;
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
+  function isPlayerUiSurface(node) {
+    var ownDescriptor = nodeDescriptor(node);
+
+    if (
+      hasAnyToken(ownDescriptor, [
+        'advert',
+        'sponsor',
+        'promo',
+        'popup',
+        'pop-up',
+        'interstitial',
+        'redirect',
+        'raid'
+      ])
+    ) {
+      return false;
+    }
+
+    var current = node;
+    var depth = 0;
+
+    while (current && depth < 5) {
+      var descriptor = nodeDescriptor(current);
+
+      if (
+        hasAnyToken(descriptor, [
+          'player',
+          'video',
+          'media-control',
+          'controls',
+          'playback'
+        ])
+      ) {
+        return true;
+      }
+
+      if (
+        current.matches &&
+        current.matches('video,audio')
+      ) {
+        return true;
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
+  function modalSemanticSignal(node) {
+    if (!node || node.nodeType !== 1) {
+      return false;
+    }
+
+    var descriptor = nodeDescriptor(node);
+
+    try {
+      if (
+        node.tagName === 'DIALOG' ||
+        node.getAttribute('role') === 'dialog' ||
+        node.getAttribute('role') === 'alertdialog' ||
+        node.getAttribute('aria-modal') === 'true'
+      ) {
+        return true;
+      }
+    } catch (_) {}
+
+    return hasAnyToken(descriptor, [
+      'modal',
+      'popup',
+      'pop-up',
+      'interstitial',
+      'advert',
+      'advertisement',
+      'sponsor',
+      'promo',
+      'ad-overlay',
+      'ad_modal',
+      'ad-modal',
+      'raid'
+    ]);
+  }
+
+  function isLikelyPlaybackModal(node) {
+    if (
+      !isPlaybackShieldActive() ||
+      !isTopDocument() ||
+      !node ||
+      node.nodeType !== 1 ||
+      node === document.documentElement ||
+      node === document.body ||
+      touchesFullscreenTree(node) ||
+      isVerificationSurface(node)
+    ) {
+      return false;
+    }
+
+    if (
+      node.matches &&
+      node.matches(
+        'video,audio,[data-kaylane-pointer],[data-kaylane-pointer-mode]'
+      )
+    ) {
+      return false;
+    }
+
+    if (
+      node.querySelector &&
+      node.querySelector('video,audio')
+    ) {
+      return false;
+    }
+
+    var style;
+
+    try {
+      style = window.getComputedStyle(node);
+    } catch (_) {
+      return false;
+    }
+
+    var position = String(style.position || '').toLowerCase();
+    var coverage = elementCoverage(node);
+    var zIndex = parsedZIndex(style);
+    var modalSignal = modalSemanticSignal(node);
+    var overlayPosition =
+      position === 'fixed' ||
+      position === 'sticky' ||
+      position === 'absolute';
+
+    if (!overlayPosition) {
+      return false;
+    }
+
+    if (modalSignal && coverage >= 0.025 && zIndex >= 10) {
+      return true;
+    }
+
+    if (
+      !isPlayerUiSurface(node) &&
+      coverage >= 0.10 &&
+      zIndex >= 40
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function restorePageAfterModalRemoval() {
+    if (activeFullscreenElement()) {
+      return;
+    }
+
+    try {
+      if (
+        document.body &&
+        document.body.style &&
+        document.body.style.overflow === 'hidden'
+      ) {
+        document.body.style.overflow = '';
+      }
+
+      if (
+        document.documentElement &&
+        document.documentElement.style &&
+        document.documentElement.style.overflow === 'hidden'
+      ) {
+        document.documentElement.style.overflow = '';
+      }
+    } catch (_) {}
+  }
+
+  function removePlaybackModal(node) {
+    var current = node;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 6
+    ) {
+      if (isLikelyPlaybackModal(current)) {
+        current.remove();
+        restorePageAfterModalRemoval();
+        return true;
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
+  function sweepPlaybackModals(root) {
+    if (!isPlaybackShieldActive()) {
+      return 0;
+    }
+
+    var removed = 0;
+    var scope = root && root.querySelectorAll ? root : document;
+    var selector = [
+      'dialog',
+      '[role="dialog"]',
+      '[role="alertdialog"]',
+      '[aria-modal="true"]',
+      '[class*="modal"]',
+      '[id*="modal"]',
+      '[class*="popup"]',
+      '[id*="popup"]',
+      '[class*="interstitial"]',
+      '[id*="interstitial"]',
+      '[class*="advert"]',
+      '[id*="advert"]',
+      '[class*="sponsor"]',
+      '[id*="sponsor"]',
+      '[class*="overlay"]',
+      '[id*="overlay"]'
+    ].join(',');
+
+    var candidates;
+
+    try {
+      candidates = scope.querySelectorAll(selector);
+    } catch (_) {
+      return 0;
+    }
+
+    for (
+      var index = 0;
+      index < candidates.length &&
+      index < MAX_MODAL_SCAN;
+      index += 1
+    ) {
+      if (removePlaybackModal(candidates[index])) {
+        removed += 1;
+      }
+    }
+
+    return removed;
+  }
+
+  function armPlaybackShield(durationMs) {
+    var requested = Number(durationMs);
+    var duration =
+      Number.isFinite(requested) && requested > 0
+        ? Math.min(requested, 45000)
+        : PLAYBACK_SHIELD_MS;
+
+    playbackShieldUntil = Math.max(
+      playbackShieldUntil,
+      Date.now() + duration
+    );
+
+    sweepPlaybackModals(document);
+    return playbackShieldUntil;
+  }
+
   function isLikelyAdOverlay(node) {
     if (
       !isTopDocument() ||
@@ -437,6 +781,34 @@ export const createPageGuardScript = (): string => {
     return stub;
   }
 
+  var nativeAlert = window.alert;
+  var nativeConfirm = window.confirm;
+  var nativePrompt = window.prompt;
+
+  window.alert = function () {
+    if (isPlaybackShieldActive()) {
+      return undefined;
+    }
+
+    return nativeAlert.apply(window, arguments);
+  };
+
+  window.confirm = function () {
+    if (isPlaybackShieldActive()) {
+      return false;
+    }
+
+    return nativeConfirm.apply(window, arguments);
+  };
+
+  window.prompt = function () {
+    if (isPlaybackShieldActive()) {
+      return null;
+    }
+
+    return nativePrompt.apply(window, arguments);
+  };
+
   // Never expose the real current window as the return value of window.open.
   // Some ad scripts assign popup.location after the call; returning window
   // would redirect Kaylane TV's only WebView. A truthy isolated stub satisfies
@@ -472,6 +844,19 @@ export const createPageGuardScript = (): string => {
   // runs against each frame's own location.
   document.addEventListener('click', function (event) {
     var target = event.target;
+
+    try {
+      var playerTarget =
+        target &&
+        target.closest &&
+        target.closest(
+          'video,audio,iframe,[class*="player"],[id*="player"],[class*="video"],[id*="video"]'
+        );
+
+      if (playerTarget || visibleMediaCoverage() >= 0.08) {
+        armPlaybackShield();
+      }
+    } catch (_) {}
     if (!target || typeof target.closest !== 'function') {
       return;
     }
@@ -516,6 +901,14 @@ export const createPageGuardScript = (): string => {
     });
   }
 
+  document.addEventListener(
+    'play',
+    function () {
+      armPlaybackShield(45000);
+    },
+    true
+  );
+
   document.addEventListener('submit', function (event) {
     var form = event.target;
     var submitter = event.submitter || null;
@@ -558,7 +951,11 @@ export const createPageGuardScript = (): string => {
   try {
     Object.defineProperty(window, '__KAYLANE_TV_GUARD_API__', {
       value: Object.freeze({
-        allowPlayerNavigation: allowPlayerNavigation
+        allowPlayerNavigation: allowPlayerNavigation,
+        armPlaybackShield: armPlaybackShield,
+        sweepPlaybackModals: function () {
+          return sweepPlaybackModals(document);
+        }
       }),
       configurable: false,
       enumerable: false,
@@ -580,6 +977,10 @@ export const createPageGuardScript = (): string => {
       return;
     }
 
+    if (removePlaybackModal(node)) {
+      return;
+    }
+
     if (removeLikelyAdOverlay(node)) {
       return;
     }
@@ -589,6 +990,7 @@ export const createPageGuardScript = (): string => {
     }
 
     if (typeof node.querySelectorAll === 'function') {
+      sweepPlaybackModals(node);
       node.querySelectorAll('iframe[src]').forEach(cleanIframe);
 
       node.querySelectorAll('a[href],iframe[src]').forEach(function (candidate) {
@@ -598,6 +1000,7 @@ export const createPageGuardScript = (): string => {
   }
 
   function cleanInitialDocument() {
+    sweepPlaybackModals(document);
     document.querySelectorAll('iframe[src]').forEach(cleanIframe);
     document.querySelectorAll('a[href],iframe[src]').forEach(function (candidate) {
       removeLikelyAdOverlay(candidate);
@@ -625,7 +1028,16 @@ export const createPageGuardScript = (): string => {
 
   observer.observe(document.documentElement || document, {
     attributes: true,
-    attributeFilter: ['src', 'href', 'style', 'class'],
+    attributeFilter: [
+      'src',
+      'href',
+      'style',
+      'class',
+      'open',
+      'role',
+      'aria-modal',
+      'aria-hidden'
+    ],
     childList: true,
     subtree: true
   });
