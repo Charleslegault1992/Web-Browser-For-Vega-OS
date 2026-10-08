@@ -105,8 +105,6 @@ const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a
 expect(png.subarray(0, 8).equals(pngSignature), 'App icon must be a PNG.');
 expect(png.readUInt32BE(16) === 512 && png.readUInt32BE(20) === 512, 'App icon must be exactly 512x512.');
 
-console.log('Static Vega/native validation passed.');
-
 expect(
   read('src/ui/BrowserHome.tsx').includes(
     'https://dofuz.com/xoitsomxvna96/home/dofuz',
@@ -117,3 +115,5 @@ expect(
   read('src/ui/BrowserHome.tsx').includes('KAYLANE_SLIDES'),
   'Kaylane home must use individual slideshow photos instead of the broken collage.',
 );
+
+console.log('Static Vega/native validation passed.');
