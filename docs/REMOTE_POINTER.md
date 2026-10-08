@@ -149,3 +149,28 @@ Pointer v7 now uses a stronger activation path:
 The browser menu now also exposes **Fermer toutes les fenêtres**, which runs a manual bounded cleanup pass for visible popup/modal/captcha/interstitial overlays while preserving legitimate source-selection and player surfaces.
 
 The options panel was changed to a compact two-column TV-safe grid. All actions fit on one 720p screen, so focus no longer has to scroll beyond the visible panel and then become difficult to recover with the D-pad.
+
+
+## Manual delete-element mode
+
+Physical testing of the automatic visual-obstruction removal showed that it was too aggressive: ordinary pointer clicks could remove legitimate page content. That automatic click-to-delete behavior is intentionally not carried forward.
+
+Normal Pointer mode is restored to activation-only behavior:
+- OK clicks/activates the visible target;
+- OK can play/pause direct HTML5 media;
+- a topmost player iframe can still follow the existing player-promotion path;
+- normal OK does not delete DOM elements.
+
+The browser menu now contains an explicit toggle:
+
+**Supprimer élément : OFF / ON**
+
+When enabled:
+- Kaylane TV automatically returns to Pointer mode;
+- the cursor changes to a red delete-state appearance;
+- OK removes the logical element under the pointer instead of clicking it;
+- modal/overlay ancestors are preferred when appropriate so one press can remove a whole nuisance card rather than only its text/icon;
+- deleted iframe signatures are quarantined so the same nuisance frame is less likely to reappear immediately;
+- actual video/audio elements and large video-shaped player iframes are protected and return a temporary “Vidéo protégée” status instead of being deleted.
+
+The toggle is OFF by default and resets when opening a new Kaylane TV site or returning to the Kaylane home screen.
