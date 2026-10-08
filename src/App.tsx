@@ -111,7 +111,11 @@ export const App = () => {
     setMode: setWebPointerMode,
     syncMode: syncWebPointerMode,
   } = useWebPointerMode({
-    active: surface === 'browser' && !optionsOpen,
+    active: surface === 'browser',
+    inputEnabled:
+      surface === 'browser' &&
+      !optionsOpen &&
+      fatalError === null,
     injectJavaScript: injectWebPointerJavaScript,
   });
 
@@ -528,6 +532,18 @@ export const App = () => {
 
       {optionsOpen ? (
         <BrowserOptions
+          currentPointerMode={webPointerMode}
+          onTogglePointerMode={() => {
+            const nextMode =
+              webPointerMode === 'pointer' ? 'focus' : 'pointer';
+            setOptionsOpen(false);
+            setWebPointerMode(nextMode);
+            showNotice(
+              nextMode === 'pointer'
+                ? 'Mode pointeur'
+                : 'Mode sélection',
+            );
+          }}
           onInteractionMode={() => {
             setOptionsOpen(false);
             setWebPointerMode('focus');
