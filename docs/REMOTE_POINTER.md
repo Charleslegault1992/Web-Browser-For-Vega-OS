@@ -9,7 +9,7 @@ Kaylane TV now has two explicit browser modes:
 - **Pointer mode** (default): D-pad moves the Kaylane pointer, OK clicks under it.
 - **Selection mode**: Vega/player native spatial focus owns D-pad and OK.
 
-Hold the center **OK / Select** button for about 700 ms to switch modes.
+Use the Fire TV **Menu** button and choose the first option to switch between Pointer and Selection modes.
 
 The injected page shows a short mode badge after a switch so the user always knows which mode is active.
 
@@ -49,9 +49,9 @@ Validate on the target Fire TV:
 - pointer survives video start and fullscreen;
 - D-pad no longer moves player focus while pointer mode is active;
 - short OK clicks under the pointer;
-- long OK switches to native selection mode;
+- Menu -> Passer en mode sélection switches to native selection mode;
 - player controls work normally in selection mode;
-- long OK returns to pointer mode;
+- Menu -> Passer en mode pointeur returns to pointer mode;
 - Back and media transport keys remain unaffected.
 
 
@@ -104,3 +104,15 @@ Kaylane TV now detects when the pointer is over an embedded native surface such 
 The next OK is therefore handled by the actual WebView/player/verification widget rather than a synthetic parent-document click.
 
 This does not solve or bypass a human-verification challenge. It only restores the user's ability to interact with the legitimate verification control using the Fire TV remote.
+
+
+## Current physical-device policy
+
+The latest Fire TV testing supersedes the earlier long-OK and automatic iframe handoff experiments.
+
+- Short OK in Pointer mode always means "click under the Kaylane pointer".
+- Holding OK does not change modes.
+- Clicking a video/iframe does not automatically force Selection mode.
+- Pointer/Selection switching is available only from the browser Menu.
+- Pointer mode continues to override D-pad directions so an active player cannot move its spatial selection in parallel.
+- Selection mode intentionally gives the WebView/player native D-pad and OK behavior.
