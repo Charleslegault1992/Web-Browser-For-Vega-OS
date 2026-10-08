@@ -33,6 +33,7 @@ const OptionButton = ({
 };
 
 type Props = {
+  onInteractionMode: () => void;
   onRetryPlayer: () => void;
   onReloadPage: () => void;
   onHome: () => void;
@@ -40,6 +41,7 @@ type Props = {
 };
 
 export const BrowserOptions = ({
+  onInteractionMode,
   onRetryPlayer,
   onReloadPage,
   onHome,
@@ -64,9 +66,14 @@ export const BrowserOptions = ({
 
       <View style={styles.actions}>
         <OptionButton
+          label="Interaction lecteur / vérification"
+          description="Donne le contrôle natif au lecteur ou au module de vérification pour utiliser OK."
+          preferredFocus={true}
+          onPress={onInteractionMode}
+        />
+        <OptionButton
           label="Relancer le lecteur"
           description="Réessaie la vidéo ou recharge le lecteur intégré sans quitter la page."
-          preferredFocus={true}
           onPress={onRetryPlayer}
         />
         <OptionButton
