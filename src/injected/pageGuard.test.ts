@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 6');
+    expect(script).toContain('version: 7');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -55,9 +55,18 @@ describe('createPageGuardScript', () => {
     expect(script).not.toContain("querySelectorAll('iframe').forEach(function");
   });
 
-  it('observes only bounded DOM changes for blocked iframe cleanup', () => {
+  it('removes only large external overlay candidates on primary top pages', () => {
+    expect(script).toContain('function isLikelyAdOverlay(node)');
+    expect(script).toContain('coverage < 0.18');
+    expect(script).toContain('zIndex < 50');
+    expect(script).toContain('touchesFullscreenTree(node)');
+    expect(script).toContain('nodeHasExternalEscape(node)');
+    expect(script).toContain('removeLikelyAdOverlay(anchor)');
+  });
+
+  it('rechecks overlays on bounded DOM/style changes without polling', () => {
     expect(script).toContain('mutation.addedNodes.forEach(cleanNode)');
-    expect(script).toContain("attributeFilter: ['src']");
+    expect(script).toContain("attributeFilter: ['src', 'href', 'style', 'class']");
     expect(script).not.toContain('setInterval(');
   });
 });
