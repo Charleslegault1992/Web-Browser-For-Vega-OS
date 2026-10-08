@@ -359,9 +359,66 @@ export const App = () => {
     [scheduleSoftReload],
   );
 
+  const promotePlayerUrl = useCallback(
+    (url: string): boolean => {
+      let parsed: URL;
+
+      try {
+        parsed = new URL(url);
+      } catch (_) {
+        return false;
+      }
+
+      if (parsed.protocol !== 'https:') {
+        return false;
+      }
+
+      setOptionsOpen(false);
+      clearNoticeTimer();
+      setNotice(null);
+
+      const serializedUrl = JSON.stringify(parsed.href);
+
+      webViewRef.current?.injectJavaScript(
+        `window.__KAYLANE_TV_GUARD_API__ &&
+window.__KAYLANE_TV_GUARD_API__.allowPlayerNavigation(${serializedUrl});
+window.location.assign(${serializedUrl});
+true;`,
+      );
+
+      showNotice('Lecteur isolé · Back pour revenir');
+      return true;
+    },
+    [clearNoticeTimer, showNotice],
+  );
+
+  const promotePlayerUnderPointer = useCallback(() => {
+    setOptionsOpen(false);
+    webViewRef.current?.injectJavaScript(
+      'window.__KAYLANE_TV_POINTER_API__ && window.__KAYLANE_TV_POINTER_API__.promoteEmbeddedPlayerAtPointer(); true;',
+    );
+  }, []);
+
   const handlePageGuardMessage = useCallback(
     (event: {nativeEvent: {data: string}}) => {
       const rawData = event.nativeEvent.data;
+
+      try {
+        const bridgeMessage = JSON.parse(rawData) as {
+          type?: string;
+          url?: string;
+        };
+
+        if (
+          bridgeMessage.type === 'kaylane-player-promote' &&
+          typeof bridgeMessage.url === 'string'
+        ) {
+          promotePlayerUrl(bridgeMessage.url);
+          return;
+        }
+      } catch (_) {
+        // Continue through the navigation-guard parser.
+      }
 
       const message = parsePageGuardMessage(rawData);
 
@@ -390,7 +447,7 @@ export const App = () => {
         return;
       }
     },
-    [clearNoticeTimer],
+    [clearNoticeTimer, promotePlayerUrl],
   );
 
   const handleNavigationRequest = useCallback(
@@ -513,6 +570,7 @@ export const App = () => {
                 : 'Mode sélection',
             );
           }}
+          onOpenEmbeddedPlayer={promotePlayerUnderPointer}
           onRetryPlayer={retryPlayer}
           onReloadPage={reloadCurrentPage}
           onHome={goHome}
