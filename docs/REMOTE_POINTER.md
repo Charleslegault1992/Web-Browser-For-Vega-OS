@@ -116,3 +116,19 @@ The latest Fire TV testing supersedes the earlier long-OK and automatic iframe h
 - Pointer/Selection switching is available only from the browser Menu.
 - Pointer mode continues to override D-pad directions so an active player cannot move its spatial selection in parallel.
 - Selection mode intentionally gives the WebView/player native D-pad and OK behavior.
+
+
+## Precision pointer tuning
+
+Physical Fire TV testing showed that a quick D-pad tap moved the pointer too far, which made small Play buttons and player controls hard to target.
+
+Pointer v5 now uses a precision-first movement curve:
+
+- a fresh direction press gives only a 7 px nudge;
+- the first ~170 ms stays at a slow precision speed;
+- acceleration starts only after the button is held;
+- maximum pointer speed is reduced;
+- friction is stronger so short taps stop immediately instead of gliding;
+- edge scrolling is also slower.
+
+Result: quick taps are for fine aiming, while holding a direction still ramps into smooth continuous travel across the TV screen.
