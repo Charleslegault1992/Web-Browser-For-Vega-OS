@@ -12,6 +12,7 @@ export type WebPointerMode = 'pointer' | 'focus';
 
 type Options = {
   active: boolean;
+  inputEnabled: boolean;
   injectJavaScript: (script: string) => void;
 };
 
@@ -22,7 +23,11 @@ const directionMap: ReadonlyArray<[UserInputEventName, string]> = [
   [UserInputEventName.Down, 'ArrowDown'],
 ];
 
-export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
+export const useWebPointerMode = ({
+  active,
+  inputEnabled,
+  injectJavaScript,
+}: Options) => {
   const addUserInputListenerCallback = useAddUserInputListenerCallback();
   const [mode, setModeState] = useState<WebPointerMode>('pointer');
   const modeRef = useRef<WebPointerMode>('pointer');
@@ -78,6 +83,7 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
   useTVEventHandler(event => {
     if (
       !active ||
+      !inputEnabled ||
       modeRef.current !== 'focus' ||
       event.eventType !== 'select'
     ) {
@@ -108,7 +114,7 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
   });
 
   useEffect(() => {
-    if (!active || mode !== 'pointer') {
+    if (!active || !inputEnabled || mode !== 'pointer') {
       return;
     }
 
@@ -138,6 +144,7 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
     };
   }, [
     active,
+    inputEnabled,
     addUserInputListenerCallback,
     injectPointerApi,
     mode,
