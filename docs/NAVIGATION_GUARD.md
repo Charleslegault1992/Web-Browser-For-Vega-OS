@@ -164,3 +164,18 @@ While browsing, Back now always asks the page's DOM history first:
 - only when DOM history is genuinely empty does the page bridge tell the native app to return to Kaylane TV home.
 
 This keeps Back inside Dofuz/Movix/player history so the user can return to the previous source selector instead of jumping straight to the Kaylane home screen.
+
+
+## Movix source-selector regression guard
+
+Physical testing after the small-modal shield showed that Movix's legitimate source/player selector could be mistaken for an ad overlay. The shield was arming too early on generic player/video wrapper classes and the aggressive added-node cleanup could remove legitimate source UI before playback started.
+
+The guard now separates source selection from playback protection:
+
+- on Movix/Dofuz primary pages, the playback shield arms from real video/audio/iframe interaction, not from generic player/video wrapper class names;
+- source/server/serveur/mirror/provider/quality/language/episode/saison/lecteur surfaces are explicitly preserved;
+- compact multi-option panels with 2–24 local interactive choices are preserved when they do not contain blocked-host or external-escape links;
+- generic aggressive removal on primary pages requires actual media presence or ad/external-navigation evidence;
+- promoted third-party player pages keep the stronger aggressive modal cleanup.
+
+This restores source selection and player opening on Movix without backing out the stronger ad-modal protections used once playback is genuinely active.
