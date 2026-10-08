@@ -209,3 +209,31 @@ Generic phrases such as "verify", "human", or "not a robot" are no longer suffic
 Obvious QR robot-check ads (for example text combining scan + QR with not-a-robot / confirm / phone language) are removed even outside the aggressive playback-modal path. Closeable modal cards tied to blocked/ad external destinations are also removed.
 
 This does not bypass a real CAPTCHA or verification challenge; trusted verification providers remain intact for manual completion.
+
+
+## No-modal policy + Dofuz bootstrap performance
+
+Physical testing showed two remaining problems:
+
+- robot / human-verification overlays could still cover playback;
+- Dofuz could stall on its three-dot loader after the increasingly aggressive mutation cleanup.
+
+The current policy is intentionally simpler:
+
+- no robot / human-verification modal is exempt anymore;
+- dialog / alertdialog / aria-modal / modal / popup / interstitial UI is removed when it appears, except legitimate Movix/Dofuz source-selection UI;
+- on promoted/non-primary player pages, modal/captcha/turnstile/recaptcha UI is pre-hidden with injected CSS before it can cover playback;
+- JavaScript alert(), confirm(), and prompt() are always neutralized so they can never block the TV UI.
+
+This does not solve or bypass a verification challenge. It simply refuses to show that source's modal; another source can be selected.
+
+To prevent the guard itself from starving Dofuz's SPA:
+
+- MutationObserver work is queued into a Set and processed once per requestAnimationFrame;
+- mutation queue size is capped at 80;
+- always-on modal scans are capped at 32 candidates;
+- playback subtree scans are capped at 40 candidates;
+- deep playback/ad scans do not run while the primary page is merely bootstrapping;
+- blocked iframe cleanup remains bounded.
+
+The result should be a responsive Dofuz homepage while still enforcing a strict no-modal playback experience.
