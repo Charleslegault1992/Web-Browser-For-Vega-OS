@@ -53,4 +53,13 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain('document.elementFromPoint(x, y)');
     expect(script).toContain('target.click()');
   });
+
+  it('hands iframe/object/embed activation back to native selection mode', () => {
+    expect(script).toContain("tag === 'IFRAME'");
+    expect(script).toContain("tag === 'EMBED'");
+    expect(script).toContain("tag === 'OBJECT'");
+    expect(script).toContain('requestNativeEmbeddedActivation(target)');
+    expect(script).toContain('kaylane-pointer-native-activation');
+    expect(script).toContain('window.ReactNativeWebView.postMessage');
+  });
 });
