@@ -179,3 +179,33 @@ The guard now separates source selection from playback protection:
 - promoted third-party player pages keep the stronger aggressive modal cleanup.
 
 This restores source selection and player opening on Movix without backing out the stronger ad-modal protections used once playback is genuinely active.
+
+
+## Movix source click must win over iframe promotion
+
+A physical-device regression showed that the pointer's iframe promotion heuristic was inspecting every element under the pointer with elementsFromPoint(). Movix can render the Source control visually above the player iframe, so the heuristic saw the iframe underneath the visible Source button and isolated the player instead of clicking Source.
+
+Pointer v6 changes that contract:
+
+- short OK always clicks the single topmost element returned by elementFromPoint();
+- short OK never auto-promotes an iframe found underneath another control;
+- player isolation remains available only through the explicit browser-menu action "Ouvrir le lecteur dans Kaylane TV";
+- explicit isolation still arms the playback modal shield.
+
+This lets Source / server controls overlay the player normally without being hijacked by iframe promotion.
+
+## Fake verification / QR ad distinction
+
+A later Fire TV screenshot showed an ad pretending to be a "Confirm you're not a robot" QR verification, with another promotional card layered in front. The previous guard preserved generic verify/human/challenge text to avoid breaking real verification, which allowed this fake ad to survive.
+
+The guard now preserves verification only when there is strong provider evidence:
+- Cloudflare Turnstile / challenges.cloudflare.com;
+- Google reCAPTCHA paths / recaptcha.net;
+- hCaptcha / hcaptcha.com;
+- corresponding strong DOM markers such as cf-turnstile, recaptcha, and hcaptcha.
+
+Generic phrases such as "verify", "human", or "not a robot" are no longer sufficient to whitelist a modal.
+
+Obvious QR robot-check ads (for example text combining scan + QR with not-a-robot / confirm / phone language) are removed even outside the aggressive playback-modal path. Closeable modal cards tied to blocked/ad external destinations are also removed.
+
+This does not bypass a real CAPTCHA or verification challenge; trusted verification providers remain intact for manual completion.
