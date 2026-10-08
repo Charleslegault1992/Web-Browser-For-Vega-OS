@@ -144,8 +144,26 @@ expect(
   'Navigation guard must remove large same-tab ad overlays.',
 );
 expect(
+  pageGuardSource.includes('__KAYLANE_TV_GUARD_API__') &&
+    pageGuardSource.includes('allowPlayerNavigation'),
+  'Navigation guard must expose one-shot promoted-player navigation.',
+);
+expect(
+  appSource.includes('kaylane-player-promote') &&
+    appSource.includes('promotePlayerUrl'),
+  'App must route promoted embedded players through the existing WebView.',
+);
+expect(
+  browserOptionsSource.includes('Ouvrir le lecteur dans Kaylane TV'),
+  'Browser options must expose the promoted-player fallback.',
+);
+expect(
   pageGuardSource.includes("attributeFilter: ['src', 'href', 'style', 'class']"),
   'Navigation guard must recheck dynamic overlay style/class/href changes.',
+);
+expect(
+  pageGuardSource.includes('visibleMediaCoverage() >= 0.20'),
+  'Promoted player pages must clean large external overlays above visible media.',
 );
 expect(playerCompatSource.includes('disableRemotePlayback = true'), 'Player compatibility must disable unsupported remote playback surfaces.');
 expect(!playerCompatSource.includes('setInterval('), 'Player compatibility must not use permanent polling.');
