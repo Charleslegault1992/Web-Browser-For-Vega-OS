@@ -136,6 +136,11 @@ expect(
   'Browser Back must override the platform Back route while browsing.',
 );
 expect(
+  appSource.includes("window.history && window.history.length > 1") &&
+    appSource.includes("kaylane-browser-history-empty"),
+  'Browser Back must consult DOM history before returning to Kaylane home.',
+);
+expect(
   backHandlerSource.includes("if (controller.isAtHome)"),
   'Back override must be released on Kaylane TV home so system behavior is not globally replaced.',
 );
@@ -177,6 +182,21 @@ expect(
   pageGuardSource.includes('function armPlaybackShield(durationMs)') &&
     pageGuardSource.includes('var PLAYBACK_SHIELD_MS = 20000'),
   'Playback modal shield must stay event-driven and bounded.',
+);
+expect(
+  pageGuardSource.includes('function isLikelyPlaybackModal(node, aggressive)') &&
+    pageGuardSource.includes('coverage >= 0.012') &&
+    pageGuardSource.includes('aggressive === true'),
+  'Playback modal shield must aggressively remove small newly-added overlays.',
+);
+expect(
+  pageGuardSource.includes('function sweepAddedOverlayTree(root)') &&
+    pageGuardSource.includes('var MAX_ADDED_NODE_SCAN = 60'),
+  'Playback modal shield must keep aggressive added-node scans bounded.',
+);
+expect(
+  pageGuardSource.includes('containsLargePlayerFrame(node)'),
+  'Playback modal shield must preserve real large player iframes.',
 );
 expect(
   pageGuardSource.includes('function isVerificationSurface(node)') &&
