@@ -365,52 +365,6 @@ export const createRemotePointerScript = (): string => `
     ensureAnimation();
   }
 
-  function isEmbeddedNativeSurface(target) {
-    var tag = String((target && target.tagName) || '').toUpperCase();
-    return tag === 'IFRAME' || tag === 'EMBED' || tag === 'OBJECT';
-  }
-
-  function requestNativeEmbeddedActivation(target) {
-    if (!isEmbeddedNativeSurface(target)) {
-      return false;
-    }
-
-    try {
-      if (
-        target &&
-        target.getAttribute &&
-        target.setAttribute &&
-        !target.getAttribute('tabindex')
-      ) {
-        target.setAttribute('tabindex', '0');
-      }
-
-      if (target && typeof target.focus === 'function') {
-        try {
-          target.focus({preventScroll: true});
-        } catch (_) {
-          target.focus();
-        }
-      }
-    } catch (_) {}
-
-    try {
-      if (
-        window.ReactNativeWebView &&
-        typeof window.ReactNativeWebView.postMessage === 'function'
-      ) {
-        window.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            type: 'kaylane-pointer-native-activation',
-            reason: 'embedded-surface'
-          })
-        );
-      }
-    } catch (_) {}
-
-    return true;
-  }
-
   function activate() {
     if (mode !== 'pointer') {
       return;
@@ -420,14 +374,6 @@ export const createRemotePointerScript = (): string => `
 
     var target = elementAtPointer();
     if (!target || target === cursor || target === modeBadge) {
-      return;
-    }
-
-    // Cross-origin video/captcha iframes cannot be clicked safely from the
-    // top document. Hand native focus back to the WebView instead so the user
-    // can press OK on the real embedded control. This does not bypass any
-    // verification; it only makes the remote interaction reachable.
-    if (requestNativeEmbeddedActivation(target)) {
       return;
     }
 
