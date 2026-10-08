@@ -96,6 +96,7 @@ export const App = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [fatalError, setFatalError] = useState<string | null>(null);
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [elementDeleteMode, setElementDeleteMode] = useState(false);
   const [webViewGeneration, setWebViewGeneration] = useState(0);
 
   const source = useMemo(() => ({uri: sourceUrl}), [sourceUrl]);
@@ -194,6 +195,17 @@ export const App = () => {
     [clearNoticeTimer, clearSoftRetryTimer],
   );
 
+  const syncElementDeleteMode = useCallback(
+    (enabled: boolean, announce = false) => {
+      webViewRef.current?.injectJavaScript(
+        `window.__KAYLANE_TV_POINTER_API__ &&
+window.__KAYLANE_TV_POINTER_API__.setDeleteMode(${enabled ? 'true' : 'false'}, ${announce ? 'true' : 'false'});
+true;`,
+      );
+    },
+    [],
+  );
+
   const openUrl = useCallback(
     (url: string) => {
       clearSoftRetryTimer();
@@ -203,6 +215,7 @@ export const App = () => {
       setNotice(null);
       setFatalError(null);
       setOptionsOpen(false);
+      setElementDeleteMode(false);
       setCanGoBack(false);
       setSourceUrl(url);
       setWebViewGeneration(previous => previous + 1);
@@ -218,6 +231,7 @@ export const App = () => {
     setNotice(null);
     setFatalError(null);
     setOptionsOpen(false);
+    setElementDeleteMode(false);
     setCanGoBack(false);
     setLoading(false);
     setSurface('home');
@@ -316,11 +330,18 @@ true;
       softRetryCountRef.current = 0;
       setLoading(false);
       syncWebPointerMode();
+      syncElementDeleteMode(elementDeleteMode, false);
       webViewRef.current?.injectJavaScript(
         'window.__KAYLANE_TV_MEDIA_API__ && window.__KAYLANE_TV_MEDIA_API__.rescan(); true;',
       );
     },
-    [clearSoftRetryTimer, syncWebPointerMode, updateCanGoBack],
+    [
+      clearSoftRetryTimer,
+      elementDeleteMode,
+      syncElementDeleteMode,
+      syncWebPointerMode,
+      updateCanGoBack,
+    ],
   );
 
   const remountCurrentPage = useCallback(() => {
@@ -537,6 +558,19 @@ true;
     );
   }, []);
 
+  const toggleElementDeleteMode = useCallback(() => {
+    const next = !elementDeleteMode;
+
+    setElementDeleteMode(next);
+    setOptionsOpen(false);
+    syncElementDeleteMode(next, true);
+    showNotice(
+      next
+        ? 'Supprimer élément : ON'
+        : 'Supprimer élément : OFF',
+    );
+  }, [elementDeleteMode, showNotice, syncElementDeleteMode]);
+
   const retryPlayer = useCallback(() => {
     setOptionsOpen(false);
     webViewRef.current?.injectJavaScript(
@@ -636,6 +670,7 @@ true;
       {optionsOpen ? (
         <BrowserOptions
           currentPointerMode={webPointerMode}
+          elementDeleteMode={elementDeleteMode}
           onTogglePointerMode={() => {
             const nextMode =
               webPointerMode === 'pointer' ? 'focus' : 'pointer';
@@ -648,6 +683,7 @@ true;
             );
           }}
           onOpenEmbeddedPlayer={promotePlayerUnderPointer}
+          onToggleElementDeleteMode={toggleElementDeleteMode}
           onClosePopups={closeAllPopups}
           onRetryPlayer={retryPlayer}
           onReloadPage={reloadCurrentPage}
