@@ -27,11 +27,13 @@ export const decideBackAction = ({
     return 'system-default';
   }
 
-  if (canGoBack) {
-    return 'webview-back';
-  }
-
-  return 'go-home';
+  // Do not trust Vega's canGoBack flag as the sole source of truth.
+  // Promoted player/source navigations can have real DOM history while
+  // native canGoBack is temporarily false. Always ask the WebView history
+  // first; the page bridge will request Kaylane home only when history is
+  // genuinely empty.
+  void canGoBack;
+  return 'webview-back';
 };
 
 export const shouldSuppressRepeatedBackPress = (
