@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 8');
+    expect(script).toContain('version: 9');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -74,9 +74,36 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('removeLikelyAdOverlay(anchor)');
   });
 
-  it('rechecks overlays on bounded DOM/style changes without polling', () => {
+  it('arms an event-driven playback modal shield around player interactions', () => {
+    expect(script).toContain('function armPlaybackShield(durationMs)');
+    expect(script).toContain('var PLAYBACK_SHIELD_MS = 20000');
+    expect(script).toContain("document.addEventListener(\n    'play'");
+    expect(script).toContain('sweepPlaybackModals(document)');
+    expect(script).toContain('isPlaybackShieldActive()');
+  });
+
+  it('suppresses modal-like overlays while preserving verification surfaces', () => {
+    expect(script).toContain('function isLikelyPlaybackModal(node)');
+    expect(script).toContain('function isVerificationSurface(node)');
+    expect(script).toContain("'captcha'");
+    expect(script).toContain("'turnstile'");
+    expect(script).toContain("node.getAttribute('aria-modal') === 'true'");
+    expect(script).toContain('coverage >= 0.10');
+    expect(script).toContain('zIndex >= 40');
+  });
+
+  it('blocks browser dialogs while playback shield is active', () => {
+    expect(script).toContain('window.alert = function ()');
+    expect(script).toContain('window.confirm = function ()');
+    expect(script).toContain('window.prompt = function ()');
+    expect(script).toContain('if (isPlaybackShieldActive())');
+  });
+
+  it('rechecks overlays on bounded DOM/style/modal changes without polling', () => {
     expect(script).toContain('mutation.addedNodes.forEach(cleanNode)');
-    expect(script).toContain("attributeFilter: ['src', 'href', 'style', 'class']");
+    expect(script).toContain("'aria-modal'");
+    expect(script).toContain("'aria-hidden'");
+    expect(script).toContain("'open'");
     expect(script).not.toContain('setInterval(');
   });
 });
