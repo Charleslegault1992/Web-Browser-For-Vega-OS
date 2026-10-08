@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 15 }),
+    value: Object.freeze({ version: 16 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -816,6 +816,181 @@ export const createPageGuardScript = (): string => {
     frame.remove();
     restorePageAfterModalRemoval();
     return true;
+  }
+
+  function isProtectedMediaDeletionTarget(node) {
+    if (!node || node.nodeType !== 1) {
+      return false;
+    }
+
+    try {
+      if (
+        node.matches &&
+        node.matches('video,audio')
+      ) {
+        return true;
+      }
+
+      if (
+        node.closest &&
+        node.closest('video,audio')
+      ) {
+        return true;
+      }
+    } catch (_) {}
+
+    if (
+      node.tagName === 'IFRAME' &&
+      isLikelyPlayerFrame(node)
+    ) {
+      return true;
+    }
+
+    try {
+      if (
+        node.querySelector &&
+        node.querySelector('video,audio')
+      ) {
+        return true;
+      }
+
+      if (node.querySelectorAll) {
+        var frames = node.querySelectorAll('iframe');
+
+        for (var index = 0; index < frames.length; index += 1) {
+          if (isLikelyPlayerFrame(frames[index])) {
+            return true;
+          }
+        }
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
+  function manualDeletionTarget(node) {
+    if (
+      !node ||
+      node.nodeType !== 1 ||
+      node === document.body ||
+      node === document.documentElement ||
+      isProtectedMediaDeletionTarget(node)
+    ) {
+      return null;
+    }
+
+    if (node.tagName === 'IFRAME') {
+      return node;
+    }
+
+    var current = node;
+    var best = node;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 7
+    ) {
+      if (isProtectedMediaDeletionTarget(current)) {
+        return null;
+      }
+
+      try {
+        if (
+          current.matches &&
+          current.matches(
+            'button,a[href],[role="button"],dialog,[role="dialog"],[role="alertdialog"],[aria-modal="true"]'
+          )
+        ) {
+          best = current;
+        }
+      } catch (_) {}
+
+      if (
+        modalSemanticSignal(current) ||
+        looksLikeVerificationModal(current)
+      ) {
+        best = current;
+      }
+
+      try {
+        var style = window.getComputedStyle(current);
+        var position = String(style.position || '').toLowerCase();
+        var coverage = elementCoverage(current);
+
+        if (
+          coverage >= 0.003 &&
+          coverage <= 0.96 &&
+          (position === 'fixed' ||
+            position === 'sticky' ||
+            position === 'absolute')
+        ) {
+          best = current;
+        }
+      } catch (_) {}
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return best;
+  }
+
+  function deleteElementAt(clientX, clientY) {
+    if (typeof document.elementFromPoint !== 'function') {
+      return 'none';
+    }
+
+    var hit = document.elementFromPoint(
+      Number(clientX) || 0,
+      Number(clientY) || 0
+    );
+
+    if (!hit) {
+      return 'none';
+    }
+
+    if (isProtectedMediaDeletionTarget(hit)) {
+      return 'protected';
+    }
+
+    var target = manualDeletionTarget(hit);
+
+    if (!target) {
+      return 'protected';
+    }
+
+    try {
+      if (target.tagName === 'IFRAME') {
+        rememberPopupFrame(target);
+        popupPurgeUntil = Math.max(
+          popupPurgeUntil,
+          Date.now() + 15000
+        );
+      } else if (target.querySelector) {
+        var nestedFrames = target.querySelectorAll(
+          'iframe[src],iframe[data-src]'
+        );
+
+        for (
+          var index = 0;
+          index < nestedFrames.length && index < 8;
+          index += 1
+        ) {
+          if (!isLikelyPlayerFrame(nestedFrames[index])) {
+            rememberPopupFrame(nestedFrames[index]);
+          }
+        }
+      }
+
+      target.remove();
+      restorePageAfterModalRemoval();
+      return 'deleted';
+    } catch (_) {
+      return 'none';
+    }
   }
 
   function isNearFrameTopRight(frame, clientX, clientY) {
@@ -1749,6 +1924,7 @@ export const createPageGuardScript = (): string => {
           return sweepPlaybackModals(document);
         },
         closePopupAt: closePopupAt,
+        deleteElementAt: deleteElementAt,
         dismissPopupFrameAt: dismissPopupFrameAt,
         closeAllPopups: closeAllPopups
       }),
