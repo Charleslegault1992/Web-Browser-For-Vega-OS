@@ -33,6 +33,8 @@ const OptionButton = ({
 };
 
 type Props = {
+  currentPointerMode: 'pointer' | 'focus';
+  onTogglePointerMode: () => void;
   onInteractionMode: () => void;
   onRetryPlayer: () => void;
   onReloadPage: () => void;
@@ -41,6 +43,8 @@ type Props = {
 };
 
 export const BrowserOptions = ({
+  currentPointerMode,
+  onTogglePointerMode,
   onInteractionMode,
   onRetryPlayer,
   onReloadPage,
@@ -66,9 +70,22 @@ export const BrowserOptions = ({
 
       <View style={styles.actions}>
         <OptionButton
+          label={
+            currentPointerMode === 'pointer'
+              ? 'Passer en mode sélection'
+              : 'Passer en mode pointeur'
+          }
+          description={
+            currentPointerMode === 'pointer'
+              ? 'Les flèches et OK contrôlent directement les éléments du lecteur ou du site.'
+              : 'Les flèches déplacent le pointeur Kaylane TV et OK clique sous le pointeur.'
+          }
+          preferredFocus={true}
+          onPress={onTogglePointerMode}
+        />
+        <OptionButton
           label="Interaction lecteur / vérification"
           description="Donne le contrôle natif au lecteur ou au module de vérification pour utiliser OK."
-          preferredFocus={true}
           onPress={onInteractionMode}
         />
         <OptionButton
