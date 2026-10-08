@@ -3,9 +3,9 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and exposes the v8 pointer API', () => {
+  it('is idempotent and exposes the v9 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
-    expect(script).toContain('version: 8');
+    expect(script).toContain('version: 9');
     expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
     expect(script).toContain('setMode: setMode');
     expect(script).toContain('setDirection: setDirection');
@@ -74,12 +74,13 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain('__KAYLANE_TV_GUARD_API__.closePopupAt');
   });
 
-  it('dismisses a popup iframe close-corner before considering player promotion', () => {
+  it('dismisses visual player obstructions before considering iframe promotion', () => {
+    expect(script).toContain('function dismissVisualObstructionAtPointer()');
+    expect(script).toContain('__KAYLANE_TV_GUARD_API__.dismissVisualObstructionAt');
+    expect(script).toContain('if (dismissVisualObstructionAtPointer())');
     expect(script).toContain('function isNearTopRightOfFrame(frame)');
     expect(script).toContain('function dismissTopmostPopupFrame(frame)');
     expect(script).toContain('__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt');
-    expect(script).toContain('isNearTopRightOfFrame(hit)');
-    expect(script).toContain('dismissTopmostPopupFrame(hit)');
     expect(script).toContain('promoteFrame(hit)');
   });
 
