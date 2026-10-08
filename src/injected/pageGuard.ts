@@ -950,6 +950,15 @@ export const createPageGuardScript = (): string => {
       return true;
     }
 
+    try {
+      if (obstruction.querySelector) {
+        var nestedPopupFrame = obstruction.querySelector('iframe[src],iframe[data-src]');
+        if (nestedPopupFrame) {
+          rememberPopupFrame(nestedPopupFrame);
+        }
+      }
+    } catch (_) {}
+
     obstruction.remove();
     restorePageAfterModalRemoval();
     return true;
