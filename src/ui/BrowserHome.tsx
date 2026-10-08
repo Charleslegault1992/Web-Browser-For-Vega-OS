@@ -1,5 +1,5 @@
-import React, {useEffect, useState} from 'react';
-import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
+import React, {useEffect, useRef, useState} from 'react';
+import {Animated, Easing, Image, Pressable, StyleSheet, Text, View} from 'react-native';
 
 import {resolvePreferredDestinationIndex} from './homeFocusPolicy';
 import {
@@ -76,28 +76,73 @@ const DestinationCard = ({
   );
 };
 
+const SLIDE_INTERVAL_MS = 5500;
+const SLIDE_FADE_OUT_MS = 180;
+const SLIDE_FADE_IN_MS = 360;
+
 const MemorySlideshow = () => {
   const [slideIndex, setSlideIndex] = useState(0);
+  const opacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (KAYLANE_SLIDES.length < 2) {
       return;
     }
 
-    const timer = setInterval(() => {
-      setSlideIndex(previous => (previous + 1) % KAYLANE_SLIDES.length);
-    }, 5500);
+    let disposed = false;
+    let animationFrame: number | null = null;
 
-    return () => clearInterval(timer);
-  }, []);
+    const showNextSlide = () => {
+      opacity.stopAnimation();
+
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: SLIDE_FADE_OUT_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }).start(({finished}) => {
+        if (!finished || disposed) {
+          return;
+        }
+
+        setSlideIndex(previous => (previous + 1) % KAYLANE_SLIDES.length);
+        opacity.setValue(0);
+
+        animationFrame = requestAnimationFrame(() => {
+          if (disposed) {
+            return;
+          }
+
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: SLIDE_FADE_IN_MS,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }).start();
+        });
+      });
+    };
+
+    const timer = setInterval(showNextSlide, SLIDE_INTERVAL_MS);
+
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+
+      if (animationFrame !== null) {
+        cancelAnimationFrame(animationFrame);
+      }
+
+      opacity.stopAnimation();
+    };
+  }, [opacity]);
 
   return (
     <View style={styles.slideshowCard}>
-      <Image
-        key={slideIndex}
+      <Animated.Image
         source={KAYLANE_SLIDES[slideIndex]}
         resizeMode="cover"
-        style={styles.slideshowImage}
+        style={[styles.slideshowImage, {opacity}]}
       />
 
       <View style={styles.slideshowShade} />

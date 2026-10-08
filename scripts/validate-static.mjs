@@ -19,6 +19,7 @@ const appSource = read('src/App.tsx');
 const playerCompatSource = read('src/injected/playerCompat.ts');
 const pointerModeSource = read('src/remote/useWebPointerMode.ts');
 const homeSource = read('src/ui/BrowserHome.tsx');
+const memoriesSource = read('src/ui/kaylaneMemories.ts');
 const pageGuardSource = read('src/injected/pageGuard.ts');
 const backHandlerSource = read('src/remote/useBrowserBackHandler.ts');
 const browserOptionsSource = read('src/ui/BrowserOptions.tsx');
@@ -185,6 +186,58 @@ expect(
   homeSource.includes('KAYLANE_SLIDES'),
   'Kaylane home must use individual slideshow photos instead of the broken collage.',
 );
+expect(
+  homeSource.includes('Animated.timing') &&
+    homeSource.includes('SLIDE_INTERVAL_MS') &&
+    homeSource.includes('clearInterval(timer)'),
+  'Kaylane slideshow must advance on one bounded timer and clean it up.',
+);
+
+const expectedSlideFiles = [
+  'kaylane-slide-01.jpg',
+  'kaylane-slide-02.jpg',
+  'kaylane-slide-03.jpg',
+  'kaylane-slide-04.jpg',
+  'kaylane-slide-05.jpg',
+];
+
+for (const fileName of expectedSlideFiles) {
+  const requirePath = `../../assets/kaylane/slides/${fileName}`;
+  expect(
+    memoriesSource.includes(`require('${requirePath}')`),
+    `Kaylane slideshow is missing ${fileName} from its bundled slide list.`,
+  );
+
+  const bytes = fs.readFileSync(
+    path.join(root, 'assets', 'kaylane', 'slides', fileName),
+  );
+  expect(
+    bytes.length >= 5_000 && bytes.length <= 250_000,
+    `${fileName} must stay TV-optimized instead of shipping a huge source image.`,
+  );
+  expect(
+    bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
+    `${fileName} must be a valid JPEG asset.`,
+  );
+}
+
+expect(
+  (memoriesSource.match(/assets\/kaylane\/slides\/kaylane-slide-/g) ?? [])
+    .length === expectedSlideFiles.length,
+  'Kaylane slideshow must contain exactly the five approved replacement photos.',
+);
+
+for (const legacyPath of [
+  'assets/kaylane/memories-grid.jpg',
+  'assets/kaylane/memories.jpg',
+  'assets/photos/kaylane-memory-home.jpg',
+  'assets/photos/kaylane-memory-outdoor.jpg',
+]) {
+  expect(
+    !fs.existsSync(path.join(root, legacyPath)),
+    `Legacy slideshow photo must stay removed: ${legacyPath}`,
+  );
+}
 expect(homeSource.includes('#TEAMDEFEUX'), 'Kaylane home must show #TEAMDEFEUX.');
 expect(
   homeSource.includes('Je suis fucking fier de toi.'),
