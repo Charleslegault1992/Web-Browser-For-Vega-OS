@@ -3,9 +3,9 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and exposes the v6 pointer API', () => {
+  it('is idempotent and exposes the v7 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
-    expect(script).toContain('version: 6');
+    expect(script).toContain('version: 7');
     expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
     expect(script).toContain('setMode: setMode');
     expect(script).toContain('setDirection: setDirection');
@@ -55,30 +55,34 @@ describe('createRemotePointerScript', () => {
     expect(script).not.toContain('setInterval(');
   });
 
-  it('uses topmost hit testing and native element click compatibility', () => {
+  it('uses robust topmost hit testing and activation events', () => {
+    expect(script).toContain('function deepElementAtPointer()');
     expect(script).toContain('document.elementFromPoint(x, y)');
+    expect(script).toContain('function interactiveTarget(target)');
+    expect(script).toContain("new PointerEvent(type");
+    expect(script).toContain("dispatchPointerEvent(target, 'pointerdown')");
+    expect(script).toContain("dispatchMouseEvent(target, 'mousedown')");
     expect(script).toContain('target.click()');
-    expect(script).toContain(
-      'Do not auto-promote any iframe found underneath it',
-    );
-    expect(script).not.toContain(
-      'var embeddedFrame = embeddedPlayerAtPointer();',
-    );
   });
 
-  it('keeps iframe promotion as an explicit menu/API action only', () => {
-    expect(script).toContain('function embeddedPlayerAtPointer()');
-    expect(script).toMatch(/document\s*\.\s*elementsFromPoint\(x, y\)/);
-    expect(script).toContain("element.tagName === 'IFRAME'");
-    expect(script).toContain('frameArea(element) > 0');
-    expect(script).toContain('kaylane-player-promote');
-    expect(script).toContain('promoteEmbeddedPlayerAtPointer');
+  it('uses direct media playback and popup-close fallbacks for OK', () => {
+    expect(script).toContain('function toggleMedia(target)');
+    expect(script).toContain('var result = media.play()');
+    expect(script).toContain('media.pause()');
+    expect(script).toContain('function isCloseTarget(target)');
+    expect(script).toContain('function closePopupAtPointer()');
+    expect(script).toContain('__KAYLANE_TV_GUARD_API__.closePopupAt');
+  });
+
+  it('promotes an iframe only when that iframe is the topmost hit target', () => {
+    expect(script).toContain("hit.tagName === 'IFRAME'");
+    expect(script).toContain('frameArea(hit) > 0');
+    expect(script).toContain('promoteFrame(hit)');
+    expect(script).toContain(
+      'Only promote when the iframe itself is the TOPMOST hit target',
+    );
     expect(script).toContain('promoteLargestEmbeddedPlayer');
-    expect(script).toContain('armPlaybackShield()');
-    expect(script).toContain('__KAYLANE_TV_GUARD_API__.armPlaybackShield');
-    expect(script).toContain("frame.getAttribute('data-src')");
-    expect(script).toContain("frame.getAttribute('data-lazy-src')");
-    expect(script).toContain('BLOCKED_HOSTS');
+    expect(script).toContain('kaylane-player-promote');
   });
 
 
