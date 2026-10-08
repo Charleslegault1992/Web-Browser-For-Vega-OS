@@ -10,7 +10,7 @@ export const createRemotePointerScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 8 }),
+    value: Object.freeze({ version: 9 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -720,6 +720,25 @@ export const createRemotePointerScript = (): string => {
     return false;
   }
 
+  function dismissVisualObstructionAtPointer() {
+    try {
+      if (
+        window.__KAYLANE_TV_GUARD_API__ &&
+        typeof window.__KAYLANE_TV_GUARD_API__.dismissVisualObstructionAt ===
+          'function'
+      ) {
+        return (
+          window.__KAYLANE_TV_GUARD_API__.dismissVisualObstructionAt(
+            x,
+            y
+          ) === true
+        );
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
   function dismissTopmostPopupFrame(frame) {
     if (
       !frame ||
@@ -840,6 +859,13 @@ export const createRemotePointerScript = (): string => {
     // keeps Movix Source/server buttons above the player fully clickable.
     var hit = deepElementAtPointer();
     if (!hit || hit === cursor || hit === modeBadge) {
+      return;
+    }
+
+    // First remove any visual layer that is literally stacked above the real
+    // player at this exact screen coordinate. This works even when the popup
+    // is an opaque cross-origin iframe with no usable DOM metadata.
+    if (dismissVisualObstructionAtPointer()) {
       return;
     }
 
