@@ -35,14 +35,14 @@ describe('decideBackAction', () => {
     ).toBe('webview-back');
   });
 
-  it('returns to app home when browser history is empty', () => {
+  it('still asks WebView history when native canGoBack is false', () => {
     expect(
       decideBackAction({
         overlayOpen: false,
         canGoBack: false,
         isAtHome: false,
       }),
-    ).toBe('go-home');
+    ).toBe('webview-back');
   });
 
   it('lets Vega handle Back from home', () => {
