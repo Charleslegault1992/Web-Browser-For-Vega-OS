@@ -562,6 +562,11 @@ true;
     const next = !elementDeleteMode;
 
     setElementDeleteMode(next);
+
+    if (next && webPointerMode !== 'pointer') {
+      setWebPointerMode('pointer');
+    }
+
     setOptionsOpen(false);
     syncElementDeleteMode(next, true);
     showNotice(
@@ -569,7 +574,13 @@ true;
         ? 'Supprimer élément : ON'
         : 'Supprimer élément : OFF',
     );
-  }, [elementDeleteMode, showNotice, syncElementDeleteMode]);
+  }, [
+    elementDeleteMode,
+    setWebPointerMode,
+    showNotice,
+    syncElementDeleteMode,
+    webPointerMode,
+  ]);
 
   const retryPlayer = useCallback(() => {
     setOptionsOpen(false);
