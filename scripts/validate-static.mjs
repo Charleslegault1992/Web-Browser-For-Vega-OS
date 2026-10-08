@@ -101,6 +101,14 @@ expect(appSource.includes('<Pressable'), 'Pointer focus capture must be a native
 expect(appSource.includes('delayLongPress={700}'), 'Pointer Pressable must preserve the 700 ms long-OK mode switch.');
 expect(appSource.includes('activatePointer()'), 'Short OK on the pointer capture must activate the DOM pointer target.');
 expect(
+  appSource.includes('kaylane-pointer-native-activation'),
+  'Embedded iframe/object activation must hand off to native WebView selection mode.',
+);
+expect(
+  appSource.includes("showNotice('Mode interaction · appuie OK pour cliquer')"),
+  'Embedded activation handoff must give the user a short interaction hint.',
+);
+expect(
   !pointerModeSource.includes('addUserInputListenerCallback(\n        UserInputEventName.Select'),
   'Pointer mode must not override Select through UserInputManager because that suppresses native Pressable OK handling.',
 );
