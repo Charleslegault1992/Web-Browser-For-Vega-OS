@@ -113,3 +113,28 @@ On Movix/Dofuz top pages, Kaylane TV now removes only overlay candidates that ar
 - tied to a known blocked host or an external escape link.
 
 The cleanup runs on the initial document and on bounded added-node / src / href / style / class mutations. It does not use polling and it does not globally delete third-party player iframes.
+
+
+## Playback modal shield
+
+Physical Fire TV testing showed a second ad pattern: pressing Play can inject small or medium modal layers directly over the video without navigating away.
+
+Kaylane TV now arms an event-driven playback shield around player interaction.
+
+The shield is armed:
+- immediately before Pointer-mode OK activation;
+- when a click targets video/audio/iframe/player-like content;
+- when HTML5 media emits a play event.
+
+While armed, the guard removes newly-added modal-like layers that are fixed/sticky/absolute and visually capable of covering playback. It detects semantic dialogs, aria-modal layers, popup/interstitial/ad/promo markers, and generic high-z overlays that are not part of player controls.
+
+The shield is intentionally bounded and optimized:
+- default click window: 20 seconds;
+- play event can extend protection to 45 seconds;
+- no setInterval or permanent polling;
+- MutationObserver only reacts to added nodes and relevant src/href/style/class/open/role/aria-modal/aria-hidden changes;
+- modal scans are capped at 40 candidates per pass.
+
+Human-verification surfaces are preserved by explicit captcha / Turnstile / hCaptcha / reCAPTCHA / challenge / verification signals. The shield does not solve or bypass those challenges.
+
+While the shield is active, blocking JavaScript alert/confirm/prompt dialogs are also suppressed so they cannot cover or freeze playback.
