@@ -1149,32 +1149,55 @@ export const createPageGuardScript = (): string => {
     return stub;
   }
 
-  var nativeAlert = window.alert;
-  var nativeConfirm = window.confirm;
-  var nativePrompt = window.prompt;
-
-  window.alert = function () {
-    if (isPlaybackShieldActive()) {
-      return undefined;
+  function installNonPrimaryModalCssShield() {
+    if (
+      isPrimaryHost(window.location.hostname) ||
+      !document.documentElement
+    ) {
+      return;
     }
 
-    return nativeAlert.apply(window, arguments);
+    var style = document.createElement('style');
+    style.setAttribute('data-kaylane-no-modal-css', 'true');
+    style.textContent = [
+      'dialog',
+      '[role="dialog"]',
+      '[role="alertdialog"]',
+      '[aria-modal="true"]',
+      '[class*="modal" i]',
+      '[id*="modal" i]',
+      '[class*="popup" i]',
+      '[id*="popup" i]',
+      '[class*="interstitial" i]',
+      '[id*="interstitial" i]',
+      '[class*="captcha" i]',
+      '[id*="captcha" i]',
+      '[class*="turnstile" i]',
+      '[id*="turnstile" i]',
+      '[class*="recaptcha" i]',
+      '[id*="recaptcha" i]'
+    ].join(',') +
+      '{display:none!important;visibility:hidden!important;pointer-events:none!important;}';
+
+    try {
+      document.documentElement.appendChild(style);
+    } catch (_) {}
+  }
+
+  installNonPrimaryModalCssShield();
+
+  // Product policy: browser dialogs are never allowed to block the TV UI.
+  // There is intentionally no playback-state exception.
+  window.alert = function () {
+    return undefined;
   };
 
   window.confirm = function () {
-    if (isPlaybackShieldActive()) {
-      return false;
-    }
-
-    return nativeConfirm.apply(window, arguments);
+    return false;
   };
 
   window.prompt = function () {
-    if (isPlaybackShieldActive()) {
-      return null;
-    }
-
-    return nativePrompt.apply(window, arguments);
+    return null;
   };
 
   // Never expose the real current window as the return value of window.open.
