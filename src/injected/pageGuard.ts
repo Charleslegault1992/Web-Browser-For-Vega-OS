@@ -215,9 +215,9 @@ export const createPageGuardScript = (): string => {
     return Number.isFinite(value) ? value : 0;
   }
 
-  function nodeHasExternalEscape(node) {
+  function collectEscapeCandidates(node) {
     if (!node || node.nodeType !== 1) {
-      return false;
+      return [];
     }
 
     var candidates = [];
@@ -228,18 +228,35 @@ export const createPageGuardScript = (): string => {
 
     if (node.querySelectorAll) {
       node.querySelectorAll('a[href],iframe[src]').forEach(function (child) {
-        if (candidates.length < 12) {
+        if (candidates.length < 16) {
           candidates.push(child);
         }
       });
     }
 
-    return candidates.some(function (candidate) {
-      var url =
-        candidate.tagName === 'IFRAME'
-          ? candidate.src || candidate.getAttribute('src') || ''
-          : candidate.href || candidate.getAttribute('href') || '';
+    return candidates;
+  }
 
+  function candidateUrl(candidate) {
+    if (!candidate) {
+      return '';
+    }
+
+    return candidate.tagName === 'IFRAME'
+      ? candidate.src || candidate.getAttribute('src') || ''
+      : candidate.href || candidate.getAttribute('href') || '';
+  }
+
+  function nodeHasBlockedHost(node) {
+    return collectEscapeCandidates(node).some(function (candidate) {
+      var url = candidateUrl(candidate);
+      return Boolean(url && isBlockedHost(url));
+    });
+  }
+
+  function nodeHasExternalEscape(node) {
+    return collectEscapeCandidates(node).some(function (candidate) {
+      var url = candidateUrl(candidate);
       if (!url) {
         return false;
       }
@@ -248,17 +265,35 @@ export const createPageGuardScript = (): string => {
         return true;
       }
 
+      if (candidate.tagName !== 'A') {
+        return false;
+      }
+
+      var parsed = parseHttpsDestination(url);
+      if (!parsed) {
+        return false;
+      }
+
       return (
-        candidate.tagName === 'A' &&
-        isUnwantedPrimaryPageEscape(url)
+        isUnwantedPrimaryPageEscape(parsed.href) ||
+        parsed.origin !== window.location.origin
       );
     });
+  }
+
+  function visibleMediaCoverage() {
+    var best = 0;
+
+    document.querySelectorAll('video,audio').forEach(function (media) {
+      best = Math.max(best, elementCoverage(media));
+    });
+
+    return best;
   }
 
   function isLikelyAdOverlay(node) {
     if (
       !isTopDocument() ||
-      !isPrimaryHost(window.location.hostname) ||
       !node ||
       node.nodeType !== 1 ||
       node === document.documentElement ||
@@ -304,7 +339,23 @@ export const createPageGuardScript = (): string => {
       return false;
     }
 
-    return nodeHasExternalEscape(node);
+    if (nodeHasBlockedHost(node)) {
+      return true;
+    }
+
+    if (isPrimaryHost(window.location.hostname)) {
+      return nodeHasExternalEscape(node);
+    }
+
+    // Once an embedded player is promoted to the top WebView, its ad layers
+    // are no longer children of Movix/Dofuz. On a real player page, remove
+    // only large high-z external overlays that sit above a substantial video.
+    return (
+      visibleMediaCoverage() >= 0.20 &&
+      coverage >= 0.25 &&
+      zIndex >= 100 &&
+      nodeHasExternalEscape(node)
+    );
   }
 
   function removeLikelyAdOverlay(node) {
