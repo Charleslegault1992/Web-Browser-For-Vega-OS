@@ -19,6 +19,9 @@ const appSource = read('src/App.tsx');
 const playerCompatSource = read('src/injected/playerCompat.ts');
 const pointerModeSource = read('src/remote/useWebPointerMode.ts');
 const homeSource = read('src/ui/BrowserHome.tsx');
+const pageGuardSource = read('src/injected/pageGuard.ts');
+const backHandlerSource = read('src/remote/useBrowserBackHandler.ts');
+const browserOptionsSource = read('src/ui/BrowserOptions.tsx');
 
 const expected = {
   packageId: 'com.kaylanetv.browser',
@@ -98,20 +101,19 @@ expect(appSource.includes('createPlayerCompatibilityScript'), 'Player compatibil
 expect(appSource.includes('FocusManager.focus'), 'Pointer mode must move native TV focus away from WebView/player controls.');
 expect(appSource.includes('pointerInputCapture'), 'Pointer mode must keep a native focus-capture layer over the WebView.');
 expect(appSource.includes('<Pressable'), 'Pointer focus capture must be a native Pressable so OK works on Vega TV.');
-expect(appSource.includes('delayLongPress={700}'), 'Pointer Pressable must preserve the 700 ms long-OK mode switch.');
-expect(appSource.includes('activatePointer()'), 'Short OK on the pointer capture must activate the DOM pointer target.');
 expect(
-  appSource.includes('kaylane-pointer-native-activation'),
-  'Embedded iframe/object activation must hand off to native WebView selection mode.',
+  !appSource.includes('delayLongPress={700}') &&
+    !appSource.includes('onLongPress='),
+  'Pointer/selection switching must be menu-only; long-OK switching must stay removed.',
+);
+expect(appSource.includes('onPress={activatePointer}'), 'Short OK on the pointer capture must activate the DOM pointer target.');
+expect(
+  !appSource.includes('kaylane-pointer-native-activation'),
+  'Embedded surfaces must not auto-switch pointer mode anymore.',
 );
 expect(
-  appSource.includes("showNotice('Mode interaction · appuie OK pour cliquer')"),
-  'Embedded activation handoff must give the user a short interaction hint.',
-);
-const browserOptionsSource = read('src/ui/BrowserOptions.tsx');
-expect(
-  browserOptionsSource.includes('Interaction lecteur / vérification'),
-  'Browser options must expose an explicit native interaction fallback.',
+  !browserOptionsSource.includes('Interaction lecteur / vérification'),
+  'Browser menu must use the single pointer/selection toggle instead of a second interaction mode.',
 );
 expect(
   browserOptionsSource.includes('Passer en mode sélection'),
@@ -126,8 +128,24 @@ expect(
   'Pointer mode must preserve state while temporarily disabling browser input for overlays.',
 );
 expect(
-  !pointerModeSource.includes('addUserInputListenerCallback(\n        UserInputEventName.Select'),
-  'Pointer mode must not override Select through UserInputManager because that suppresses native Pressable OK handling.',
+  !pointerModeSource.includes('UserInputEventName.Select'),
+  'Pointer/selection mode switching must not be tied to Select/hold logic.',
+);
+expect(
+  backHandlerSource.includes('UserInputEventName.Back'),
+  'Browser Back must override the platform Back route while browsing.',
+);
+expect(
+  backHandlerSource.includes("if (controller.isAtHome)"),
+  'Back override must be released on Kaylane TV home so system behavior is not globally replaced.',
+);
+expect(
+  pageGuardSource.includes('function isLikelyAdOverlay(node)'),
+  'Navigation guard must remove large same-tab ad overlays.',
+);
+expect(
+  pageGuardSource.includes("attributeFilter: ['src', 'href', 'style', 'class']"),
+  'Navigation guard must recheck dynamic overlay style/class/href changes.',
 );
 expect(playerCompatSource.includes('disableRemotePlayback = true'), 'Player compatibility must disable unsupported remote playback surfaces.');
 expect(!playerCompatSource.includes('setInterval('), 'Player compatibility must not use permanent polling.');
