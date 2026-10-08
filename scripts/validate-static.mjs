@@ -141,6 +141,11 @@ expect(
   'Native app state must keep delete-element mode synchronized with the page pointer.',
 );
 expect(
+  (appSource.match(/setElementDeleteMode\(false\)/g) || []).length >= 2 &&
+    appSource.includes("if (next && webPointerMode !== 'pointer')"),
+  'Delete-element mode must reset on app/site entry boundaries and force pointer mode when enabled.',
+);
+expect(
   browserOptionsSource.includes("width: '49%'") &&
     browserOptionsSource.includes("flexWrap: 'wrap'"),
   'Browser options must stay in a compact two-column TV-safe grid.',
