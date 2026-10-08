@@ -8,7 +8,7 @@ export const KAYLANE_SLIDES: readonly ImageSourcePropType[] = [
 ];
 
 export const KAYLANE_LOVE_LINES = [
-  'Je suis fier de toi.',
+  'Je suis fucking fier de toi.',
   'Je t’aime plus que tout.',
-  'Tu es l’amour de ma vie.',
+  '#TEAMDEFEUX',
 ] as const;
