@@ -26,8 +26,23 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
   const addUserInputListenerCallback = useAddUserInputListenerCallback();
   const [mode, setModeState] = useState<WebPointerMode>('pointer');
   const modeRef = useRef<WebPointerMode>('pointer');
-  const selectDownAtRef = useRef<number | null>(null);
-  const focusSelectDownAtRef = useRef<number | null>(null);
+  const pointerHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const focusHoldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ignoreSelectUntilReleaseRef = useRef(false);
+
+  const clearPointerHold = useCallback(() => {
+    if (pointerHoldTimerRef.current !== null) {
+      clearTimeout(pointerHoldTimerRef.current);
+      pointerHoldTimerRef.current = null;
+    }
+  }, []);
+
+  const clearFocusHold = useCallback(() => {
+    if (focusHoldTimerRef.current !== null) {
+      clearTimeout(focusHoldTimerRef.current);
+      focusHoldTimerRef.current = null;
+    }
+  }, []);
 
   const injectPointerApi = useCallback(
     (expression: string) => {
@@ -39,13 +54,13 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
   );
 
   const setMode = useCallback(
-    (nextMode: WebPointerMode) => {
+    (nextMode: WebPointerMode, announce = true) => {
       modeRef.current = nextMode;
       setModeState(nextMode);
       injectPointerApi(
         `window.__KAYLANE_TV_POINTER_API__.setMode(${JSON.stringify(
           nextMode,
-        )}, true)`,
+        )}, ${announce ? 'true' : 'false'})`,
       );
     },
     [injectPointerApi],
@@ -69,26 +84,32 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
       return;
     }
 
+    if (ignoreSelectUntilReleaseRef.current) {
+      if (event.eventKeyAction === 1) {
+        ignoreSelectUntilReleaseRef.current = false;
+      }
+      return;
+    }
+
     if (event.eventKeyAction === 0) {
-      if (focusSelectDownAtRef.current === null) {
-        focusSelectDownAtRef.current = Date.now();
+      if (focusHoldTimerRef.current === null) {
+        focusHoldTimerRef.current = setTimeout(() => {
+          focusHoldTimerRef.current = null;
+          ignoreSelectUntilReleaseRef.current = true;
+          setMode('pointer');
+        }, HOLD_TO_TOGGLE_MS);
       }
       return;
     }
 
     if (event.eventKeyAction === 1) {
-      const startedAt = focusSelectDownAtRef.current;
-      focusSelectDownAtRef.current = null;
-
-      if (startedAt !== null && Date.now() - startedAt >= HOLD_TO_TOGGLE_MS) {
-        setMode('pointer');
-      }
+      clearFocusHold();
     }
   });
 
   useEffect(() => {
     if (!active || mode !== 'pointer') {
-      selectDownAtRef.current = null;
+      clearPointerHold();
       return;
     }
 
@@ -107,23 +128,31 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
       addUserInputListenerCallback(
         UserInputEventName.Select,
         (event: UserInputEvent) => {
-          if (event.phase === 'PRESSED') {
-            if (selectDownAtRef.current === null) {
-              selectDownAtRef.current = Date.now();
+          if (ignoreSelectUntilReleaseRef.current) {
+            if (event.phase === 'RELEASED') {
+              ignoreSelectUntilReleaseRef.current = false;
             }
             return true;
           }
 
-          const startedAt = selectDownAtRef.current;
-          selectDownAtRef.current = null;
+          if (event.phase === 'PRESSED') {
+            if (pointerHoldTimerRef.current === null) {
+              pointerHoldTimerRef.current = setTimeout(() => {
+                pointerHoldTimerRef.current = null;
+                ignoreSelectUntilReleaseRef.current = true;
+                setMode('focus');
+              }, HOLD_TO_TOGGLE_MS);
+            }
+            return true;
+          }
 
-          if (
-            startedAt !== null &&
-            Date.now() - startedAt >= HOLD_TO_TOGGLE_MS
-          ) {
-            setMode('focus');
-          } else {
-            injectPointerApi('window.__KAYLANE_TV_POINTER_API__.activate()');
+          if (event.phase === 'RELEASED') {
+            const wasShortPress = pointerHoldTimerRef.current !== null;
+            clearPointerHold();
+
+            if (wasShortPress) {
+              injectPointerApi('window.__KAYLANE_TV_POINTER_API__.activate()');
+            }
           }
 
           return true;
@@ -132,6 +161,7 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
     );
 
     return () => {
+      clearPointerHold();
       subscriptions.forEach(subscription => subscription.remove());
       directionMap.forEach(([, key]) => {
         injectPointerApi(
@@ -144,6 +174,7 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
   }, [
     active,
     addUserInputListenerCallback,
+    clearPointerHold,
     injectPointerApi,
     mode,
     setMode,
@@ -151,12 +182,21 @@ export const useWebPointerMode = ({active, injectJavaScript}: Options) => {
 
   useEffect(() => {
     if (!active) {
-      selectDownAtRef.current = null;
-      focusSelectDownAtRef.current = null;
+      clearPointerHold();
+      clearFocusHold();
+      ignoreSelectUntilReleaseRef.current = false;
       modeRef.current = 'pointer';
       setModeState('pointer');
     }
-  }, [active]);
+  }, [active, clearFocusHold, clearPointerHold]);
 
-  return {mode, syncMode};
+  useEffect(
+    () => () => {
+      clearPointerHold();
+      clearFocusHold();
+    },
+    [clearFocusHold, clearPointerHold],
+  );
+
+  return {mode, setMode, syncMode};
 };
