@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 10 }),
+    value: Object.freeze({ version: 11 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -375,6 +375,73 @@ export const createPageGuardScript = (): string => {
     return false;
   }
 
+  function isSourceSelectionSurface(node) {
+    if (!isPrimaryHost(window.location.hostname) || !node) {
+      return false;
+    }
+
+    var current = node;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 5
+    ) {
+      var descriptor = nodeDescriptor(current);
+
+      if (
+        hasAnyToken(descriptor, [
+          'source',
+          'sources',
+          'server',
+          'serveur',
+          'mirror',
+          'provider',
+          'quality',
+          'language',
+          'lang',
+          'episode',
+          'season',
+          'saison',
+          'lecteur'
+        ])
+      ) {
+        return true;
+      }
+
+      if (
+        current.matches &&
+        current.matches('select,option')
+      ) {
+        return true;
+      }
+
+      if (
+        current.querySelectorAll &&
+        !modalSemanticSignal(current)
+      ) {
+        var interactiveCount = current.querySelectorAll(
+          'button,a[href],[role="button"],input[type="radio"]'
+        ).length;
+
+        if (
+          interactiveCount >= 2 &&
+          interactiveCount <= 24 &&
+          elementCoverage(current) <= 0.55
+        ) {
+          return true;
+        }
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
   function isPlayerUiSurface(node) {
     if (!node || node.nodeType !== 1) {
       return false;
@@ -492,7 +559,8 @@ export const createPageGuardScript = (): string => {
       node === document.documentElement ||
       node === document.body ||
       touchesFullscreenTree(node) ||
-      isVerificationSurface(node)
+      isVerificationSurface(node) ||
+      isSourceSelectionSurface(node)
     ) {
       return false;
     }
@@ -555,7 +623,18 @@ export const createPageGuardScript = (): string => {
       !isPlayerUiSurface(node) &&
       coverage >= 0.012
     ) {
-      return true;
+      if (!isPrimaryHost(window.location.hostname)) {
+        return true;
+      }
+
+      if (
+        hasActivePlayingMedia() ||
+        visibleMediaCoverage() >= 0.12 ||
+        nodeHasBlockedHost(node) ||
+        nodeHasExternalEscape(node)
+      ) {
+        return true;
+      }
     }
 
     if (
@@ -934,14 +1013,20 @@ export const createPageGuardScript = (): string => {
     var target = event.target;
 
     try {
-      var playerTarget =
+      var directMediaTarget =
+        target &&
+        target.closest &&
+        target.closest('video,audio,iframe');
+
+      var promotedPlayerTarget =
+        !isPrimaryHost(window.location.hostname) &&
         target &&
         target.closest &&
         target.closest(
-          'video,audio,iframe,[class*="player"],[id*="player"],[class*="video"],[id*="video"]'
+          '[class*="player"],[id*="player"],[class*="video"],[id*="video"]'
         );
 
-      if (playerTarget || visibleMediaCoverage() >= 0.08) {
+      if (directMediaTarget || promotedPlayerTarget) {
         armPlaybackShield();
       }
     } catch (_) {}
