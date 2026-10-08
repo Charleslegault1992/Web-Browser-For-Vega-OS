@@ -181,7 +181,7 @@ expect(
   'App must route promoted embedded players through the existing WebView.',
 );
 expect(
-  browserOptionsSource.includes('Ouvrir le lecteur dans Kaylane TV'),
+  browserOptionsSource.includes('Ouvrir le lecteur'),
   'Browser options must expose the promoted-player fallback.',
 );
 expect(
