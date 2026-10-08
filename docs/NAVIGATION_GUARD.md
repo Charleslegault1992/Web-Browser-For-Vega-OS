@@ -237,3 +237,19 @@ To prevent the guard itself from starving Dofuz's SPA:
 - blocked iframe cleanup remains bounded.
 
 The result should be a responsive Dofuz homepage while still enforcing a strict no-modal playback experience.
+
+
+## Recurring cross-origin popup iframe quarantine
+
+Physical Fire TV testing showed a remaining case where a white QR/robot ad is rendered inside a cross-origin iframe. From the parent page, the close X is not visible as a DOM button; the only hit-test result is the iframe itself. The previous pointer logic therefore treated that click as "open/isolate this player".
+
+The guard now has an iframe-popup quarantine path:
+
+- pointer OK in the top-right close zone of a topmost iframe asks the guard to dismiss that iframe instead of promoting it;
+- dismissed popup frames are remembered by HTTPS origin + path signature;
+- if the site recreates the same popup 2–3 seconds later, the MutationObserver removes the repeated frame automatically;
+- dismissing a popup or running the manual cleanup arms a 15-second event-driven purge window for delayed reinsertion;
+- the manual **Fermer toutes les fenêtres** pass now includes iframe[src] and iframe[data-src] candidates, not only DOM nodes with modal/popup class names;
+- video-shaped iframes (large 16:9-ish surfaces) are protected from generic purge heuristics unless the user explicitly hits their close-corner path.
+
+This remains event-driven: there is no polling timer and no repeated background scan.
