@@ -528,6 +528,11 @@ export const App = () => {
 
       {optionsOpen ? (
         <BrowserOptions
+          onInteractionMode={() => {
+            setOptionsOpen(false);
+            setWebPointerMode('focus');
+            showNotice('Mode interaction · utilise les flèches et OK');
+          }}
           onRetryPlayer={retryPlayer}
           onReloadPage={reloadCurrentPage}
           onHome={goHome}
