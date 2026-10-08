@@ -99,3 +99,17 @@ Kaylane TV now returns an isolated popup stub rather than the real `window`. Wri
 On a primary Movix/Dofuz top document, explicit same-tab escapes to unrelated HTTPS hosts are consumed. This guard is scoped to the frame's own hostname, so third-party player/media iframes are not globally denied. Known nuisance hosts remain blocked independently.
 
 When Chromium's Navigation API is available, the guard also cancels matching scripted top-level transitions. This closes the `location`/scripted-navigation path without adding polling.
+
+
+## Overlay-ad cleanup after physical playback testing
+
+Some nuisance ads do not navigate away immediately. Instead they insert a high-z-index fixed/absolute overlay above the active video and intercept the next remote click.
+
+On Movix/Dofuz top pages, Kaylane TV now removes only overlay candidates that are:
+- large enough to cover a meaningful portion of the viewport;
+- fixed/sticky/absolute with a high z-index;
+- outside the active fullscreen tree;
+- not a video/audio container;
+- tied to a known blocked host or an external escape link.
+
+The cleanup runs on the initial document and on bounded added-node / src / href / style / class mutations. It does not use polling and it does not globally delete third-party player iframes.
