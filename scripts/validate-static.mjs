@@ -165,6 +165,18 @@ expect(
   pageGuardSource.includes('visibleMediaCoverage() >= 0.20'),
   'Promoted player pages must clean large external overlays above visible media.',
 );
+const remotePointerSource = read('src/injected/remotePointer.ts');
+expect(
+  remotePointerSource.includes('var PRECISION_NUDGE = 7') &&
+    remotePointerSource.includes('var PRECISION_SPEED = 120') &&
+    remotePointerSource.includes('var PRECISION_HOLD_MS = 170'),
+  'Pointer must keep the precision-first tap/hold movement profile.',
+);
+expect(
+  remotePointerSource.includes('var MAX_SPEED = 650') &&
+    remotePointerSource.includes('var FRICTION = 18'),
+  'Pointer must keep the reduced top speed and stronger stopping friction.',
+);
 expect(playerCompatSource.includes('disableRemotePlayback = true'), 'Player compatibility must disable unsupported remote playback surfaces.');
 expect(!playerCompatSource.includes('setInterval('), 'Player compatibility must not use permanent polling.');
 expect(appSource.includes('callback.cancel();'), 'SSL error handler must explicitly fail closed.');
