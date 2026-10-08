@@ -1,0 +1,47 @@
+{
+  "name": "kaylane-tv",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "react-native start",
+    "validate:static": "node scripts/validate-static.mjs",
+    "typecheck": "tsc --noEmit",
+    "doctor": "vega project doctor",
+    "build": "react-native build-vega",
+    "build:debug": "react-native build-vega --build-type Debug",
+    "build:release": "react-native build-vega --build-type Release",
+    "test": "jest --runInBand"
+  },
+  "dependencies": {
+    "@amazon-devices/react-native-kepler": "~4.0.0+rn0.83.0",
+    "@amazon-devices/webview": "~4.0",
+    "react": "19.2.0",
+    "react-native": "0.83.0"
+  },
+  "devDependencies": {
+    "@amazon-devices/kepler-cli-platform": "~0.22.0",
+    "@amazon-devices/keplerscript-commonmodules": "~1.0.0",
+    "@babel/core": "^7.25.2",
+    "@babel/preset-env": "^7.25.3",
+    "@babel/runtime": "^7.25.0",
+    "@react-native-community/cli": "^20.0.0",
+    "@react-native/babel-preset": "0.83.0",
+    "@react-native/metro-config": "0.83.0",
+    "@react-native/typescript-config": "0.83.0",
+    "@types/react": "^19.2.0",
+    "typescript": "5.8.3",
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5"
+  },
+  "engines": {
+    "node": ">=22.14.0"
+  },
+  "kepler": {
+    "projectType": "application",
+    "appName": "kaylanetv",
+    "targets": [
+      "tv"
+    ]
+  }
+}
