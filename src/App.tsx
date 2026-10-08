@@ -395,7 +395,7 @@ true;`,
   const promotePlayerUnderPointer = useCallback(() => {
     setOptionsOpen(false);
     webViewRef.current?.injectJavaScript(
-      'window.__KAYLANE_TV_POINTER_API__ && window.__KAYLANE_TV_POINTER_API__.promoteEmbeddedPlayerAtPointer(); true;',
+      'window.__KAYLANE_TV_POINTER_API__ && window.__KAYLANE_TV_POINTER_API__.promoteLargestEmbeddedPlayer(); true;',
     );
   }, []);
 
