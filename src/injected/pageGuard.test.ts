@@ -5,7 +5,7 @@ describe('createPageGuardScript', () => {
 
   it('is explicitly idempotent and versioned', () => {
     expect(script).toContain('if (window.__KAYLANE_TV_GUARD__)');
-    expect(script).toContain('version: 11');
+    expect(script).toContain('version: 12');
   });
 
   it('returns an isolated popup stub instead of the real window', () => {
@@ -82,14 +82,26 @@ describe('createPageGuardScript', () => {
     expect(script).toContain('isPlaybackShieldActive()');
   });
 
-  it('suppresses modal-like overlays while preserving verification surfaces', () => {
+  it('suppresses modal-like overlays while preserving only trusted verification surfaces', () => {
     expect(script).toContain('function isLikelyPlaybackModal(node, aggressive)');
     expect(script).toContain('function isVerificationSurface(node)');
-    expect(script).toContain("'captcha'");
-    expect(script).toContain("'turnstile'");
+    expect(script).toContain('function isTrustedVerificationUrl(url)');
+    expect(script).toContain("'challenges.cloudflare.com'");
+    expect(script).toContain("'www.recaptcha.net'");
+    expect(script).toContain("'hcaptcha.com'");
+    expect(script).toContain("'cf-turnstile'");
     expect(script).toContain("node.getAttribute('aria-modal') === 'true'");
     expect(script).toContain('coverage >= 0.012');
     expect(script).toContain('aggressive === true');
+  });
+
+  it('removes fake QR robot-check ads instead of preserving generic verify/human text', () => {
+    expect(script).toContain('function looksLikeFakeVerificationAd(node)');
+    expect(script).toContain("text.indexOf('scan the qr')");
+    expect(script).toContain("text.indexOf('not a robot')");
+    expect(script).toContain("text.indexOf('your phone')");
+    expect(script).toContain('function removeObviousStandaloneAdModal(node)');
+    expect(script).not.toContain("'verification',\n          'human'");
   });
 
   it('blocks browser dialogs while playback shield is active', () => {
