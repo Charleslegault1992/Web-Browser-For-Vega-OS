@@ -158,8 +158,16 @@ expect(
   'Browser options must expose the promoted-player fallback.',
 );
 expect(
-  pageGuardSource.includes("attributeFilter: ['src', 'href', 'style', 'class']"),
-  'Navigation guard must recheck dynamic overlay style/class/href changes.',
+  pageGuardSource.includes('attributeFilter: [') &&
+    pageGuardSource.includes("'src'") &&
+    pageGuardSource.includes("'href'") &&
+    pageGuardSource.includes("'style'") &&
+    pageGuardSource.includes("'class'") &&
+    pageGuardSource.includes("'open'") &&
+    pageGuardSource.includes("'role'") &&
+    pageGuardSource.includes("'aria-modal'") &&
+    pageGuardSource.includes("'aria-hidden'"),
+  'Navigation guard must recheck dynamic overlay and modal state changes.',
 );
 expect(
   pageGuardSource.includes('visibleMediaCoverage() >= 0.20'),
