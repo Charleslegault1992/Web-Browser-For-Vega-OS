@@ -35,6 +35,7 @@ const OptionButton = ({
 type Props = {
   currentPointerMode: 'pointer' | 'focus';
   onTogglePointerMode: () => void;
+  onOpenEmbeddedPlayer: () => void;
   onRetryPlayer: () => void;
   onReloadPage: () => void;
   onHome: () => void;
@@ -44,6 +45,7 @@ type Props = {
 export const BrowserOptions = ({
   currentPointerMode,
   onTogglePointerMode,
+  onOpenEmbeddedPlayer,
   onRetryPlayer,
   onReloadPage,
   onHome,
@@ -80,6 +82,11 @@ export const BrowserOptions = ({
           }
           preferredFocus={true}
           onPress={onTogglePointerMode}
+        />
+        <OptionButton
+          label="Ouvrir le lecteur dans Kaylane TV"
+          description="Si la vidéo est intégrée dans une iframe, ouvre ce lecteur directement dans le même navigateur pour rendre le pointeur cliquable."
+          onPress={onOpenEmbeddedPlayer}
         />
         <OptionButton
           label="Relancer le lecteur"
