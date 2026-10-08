@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 14 }),
+    value: Object.freeze({ version: 15 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -31,6 +31,8 @@ export const createPageGuardScript = (): string => {
   var MAX_MUTATION_QUEUE = 80;
   var mutationQueue = new Set();
   var mutationFrame = 0;
+  var popupPurgeUntil = 0;
+  var quarantinedPopupSignatures = new Set();
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -643,6 +645,213 @@ export const createPageGuardScript = (): string => {
     return false;
   }
 
+  function popupFrameSignature(frame) {
+    if (!frame || frame.nodeType !== 1 || frame.tagName !== 'IFRAME') {
+      return '';
+    }
+
+    var raw =
+      frame.src ||
+      frame.getAttribute('src') ||
+      frame.getAttribute('data-src') ||
+      '';
+
+    var parsed = parseHttpsDestination(raw);
+    if (!parsed) {
+      return '';
+    }
+
+    return parsed.origin + parsed.pathname;
+  }
+
+  function rememberPopupFrame(frame) {
+    var signature = popupFrameSignature(frame);
+
+    if (signature) {
+      quarantinedPopupSignatures.add(signature);
+    }
+  }
+
+  function isQuarantinedPopupFrame(frame) {
+    var signature = popupFrameSignature(frame);
+    return Boolean(
+      signature && quarantinedPopupSignatures.has(signature)
+    );
+  }
+
+  function frameOverlayEvidence(frame) {
+    if (!frame || frame.tagName !== 'IFRAME') {
+      return false;
+    }
+
+    var current = frame;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 5
+    ) {
+      var style;
+
+      try {
+        style = window.getComputedStyle(current);
+      } catch (_) {
+        style = null;
+      }
+
+      if (style) {
+        var position = String(style.position || '').toLowerCase();
+        var zIndex = parsedZIndex(style);
+        var coverage = elementCoverage(current);
+
+        if (
+          (position === 'fixed' ||
+            position === 'sticky' ||
+            position === 'absolute') &&
+          coverage >= 0.005 &&
+          coverage <= 0.92 &&
+          zIndex >= 5
+        ) {
+          return true;
+        }
+      }
+
+      if (
+        modalSemanticSignal(current) ||
+        looksLikeVerificationModal(current) ||
+        hasCloseControl(current)
+      ) {
+        return true;
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    return false;
+  }
+
+  function removePopupFrame(frame, force) {
+    if (
+      !frame ||
+      frame.nodeType !== 1 ||
+      frame.tagName !== 'IFRAME' ||
+      isSourceSelectionSurface(frame)
+    ) {
+      return false;
+    }
+
+    var shouldRemove =
+      force === true ||
+      isQuarantinedPopupFrame(frame) ||
+      isBlockedHost(candidateUrl(frame)) ||
+      frameOverlayEvidence(frame);
+
+    if (!shouldRemove) {
+      return false;
+    }
+
+    rememberPopupFrame(frame);
+
+    var current = frame;
+    var depth = 0;
+
+    while (
+      current &&
+      current !== document.body &&
+      current !== document.documentElement &&
+      depth < 5
+    ) {
+      if (
+        current !== frame &&
+        (modalSemanticSignal(current) ||
+          looksLikeVerificationModal(current) ||
+          hasCloseControl(current))
+      ) {
+        current.remove();
+        restorePageAfterModalRemoval();
+        return true;
+      }
+
+      current = current.parentElement;
+      depth += 1;
+    }
+
+    frame.remove();
+    restorePageAfterModalRemoval();
+    return true;
+  }
+
+  function isNearFrameTopRight(frame, clientX, clientY) {
+    if (
+      !frame ||
+      frame.tagName !== 'IFRAME' ||
+      typeof frame.getBoundingClientRect !== 'function'
+    ) {
+      return false;
+    }
+
+    var rect = frame.getBoundingClientRect();
+    if (rect.width < 120 || rect.height < 80) {
+      return false;
+    }
+
+    var localX = Number(clientX) - rect.left;
+    var localY = Number(clientY) - rect.top;
+
+    return (
+      localX >= rect.width * 0.68 &&
+      localY <= Math.max(90, rect.height * 0.30)
+    );
+  }
+
+  function dismissPopupFrameAt(clientX, clientY, forceCloseCorner) {
+    if (typeof document.elementFromPoint !== 'function') {
+      return false;
+    }
+
+    var hit = document.elementFromPoint(
+      Number(clientX) || 0,
+      Number(clientY) || 0
+    );
+
+    if (!hit) {
+      return false;
+    }
+
+    var frame =
+      hit.tagName === 'IFRAME'
+        ? hit
+        : hit.closest
+          ? hit.closest('iframe')
+          : null;
+
+    if (!frame) {
+      return false;
+    }
+
+    var closeCorner =
+      forceCloseCorner === true &&
+      isNearFrameTopRight(frame, clientX, clientY);
+
+    if (!closeCorner && !frameOverlayEvidence(frame)) {
+      return false;
+    }
+
+    popupPurgeUntil = Math.max(
+      popupPurgeUntil,
+      Date.now() + 15000
+    );
+
+    return removePopupFrame(frame, closeCorner);
+  }
+
+  function popupPurgeActive() {
+    return Date.now() < popupPurgeUntil;
+  }
+
   function closePopupAt(clientX, clientY) {
     if (typeof document.elementFromPoint !== 'function') {
       return false;
@@ -653,11 +862,24 @@ export const createPageGuardScript = (): string => {
       Number(clientY) || 0
     );
 
-    return removeManualPopup(target);
+    if (removeManualPopup(target)) {
+      popupPurgeUntil = Math.max(
+        popupPurgeUntil,
+        Date.now() + 15000
+      );
+      return true;
+    }
+
+    return dismissPopupFrameAt(clientX, clientY, true);
   }
 
   function closeAllPopups() {
     var removed = 0;
+
+    popupPurgeUntil = Math.max(
+      popupPurgeUntil,
+      Date.now() + 15000
+    );
     var selector = [
       'dialog',
       '[role="dialog"]',
@@ -680,7 +902,9 @@ export const createPageGuardScript = (): string => {
       '[class*="advert"]',
       '[id*="advert"]',
       '[class*="sponsor"]',
-      '[id*="sponsor"]'
+      '[id*="sponsor"]',
+      'iframe[src]',
+      'iframe[data-src]'
     ].join(',');
 
     var candidates;
@@ -696,7 +920,13 @@ export const createPageGuardScript = (): string => {
       index >= 0 && index >= candidates.length - 120;
       index -= 1
     ) {
-      if (removeManualPopup(candidates[index])) {
+      var candidate = candidates[index];
+
+      if (
+        candidate.tagName === 'IFRAME'
+          ? removePopupFrame(candidate, popupPurgeActive())
+          : removeManualPopup(candidate)
+      ) {
         removed += 1;
       }
     }
@@ -1485,6 +1715,7 @@ export const createPageGuardScript = (): string => {
           return sweepPlaybackModals(document);
         },
         closePopupAt: closePopupAt,
+        dismissPopupFrameAt: dismissPopupFrameAt,
         closeAllPopups: closeAllPopups
       }),
       configurable: false,
@@ -1494,7 +1725,24 @@ export const createPageGuardScript = (): string => {
   } catch (_) {}
 
   function cleanIframe(frame) {
-    if (frame && frame.src && isBlockedHost(frame.src)) {
+    if (!frame) {
+      return false;
+    }
+
+    if (
+      isQuarantinedPopupFrame(frame) ||
+      (frame.src && isBlockedHost(frame.src))
+    ) {
+      frame.remove();
+      return true;
+    }
+
+    if (
+      popupPurgeActive() &&
+      frameOverlayEvidence(frame) &&
+      !isSourceSelectionSurface(frame)
+    ) {
+      rememberPopupFrame(frame);
       frame.remove();
       return true;
     }
