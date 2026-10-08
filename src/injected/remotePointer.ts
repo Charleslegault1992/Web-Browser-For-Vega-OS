@@ -162,7 +162,7 @@ export const createRemotePointerScript = (): string => `
     ensureUiAttached();
   }
 
-  function announceMode(initial) {
+  function announceMode() {
     createModeBadge();
     if (!modeBadge) {
       return;
@@ -174,17 +174,15 @@ export const createRemotePointerScript = (): string => `
     }
 
     modeBadge.textContent =
-      mode === 'pointer'
-        ? 'Pointeur • Maintiens OK : sélection'
-        : 'Sélection • Maintiens OK : pointeur';
+      mode === 'pointer' ? 'Mode pointeur' : 'Mode sélection';
     modeBadge.style.opacity = '1';
 
     badgeTimer = setTimeout(function () {
       badgeTimer = 0;
       if (modeBadge) {
-        modeBadge.style.opacity = initial ? '0.68' : '0';
+        modeBadge.style.opacity = '0';
       }
-    }, initial ? 2200 : 1500);
+    }, 1300);
   }
 
   function elementAtPointer() {
@@ -411,7 +409,7 @@ export const createRemotePointerScript = (): string => `
     render();
 
     if (shouldAnnounce !== false) {
-      announceMode(false);
+      announceMode();
     }
   }
 
@@ -470,7 +468,6 @@ export const createRemotePointerScript = (): string => `
   function handleFullscreenChange() {
     ensureUiAttached();
     render();
-    announceMode(false);
   }
 
   document.addEventListener('fullscreenchange', handleFullscreenChange, true);
@@ -515,7 +512,6 @@ export const createRemotePointerScript = (): string => `
         createCursor();
         createModeBadge();
         render();
-        announceMode(true);
       },
       {once: true}
     );
@@ -523,7 +519,6 @@ export const createRemotePointerScript = (): string => `
     createCursor();
     createModeBadge();
     render();
-    announceMode(true);
   }
 
   return true;
