@@ -407,6 +407,21 @@ export const createRemotePointerScript = (): string => {
     });
   }
 
+  function frameSource(frame) {
+    if (!frame || !frame.getAttribute) {
+      return '';
+    }
+
+    return (
+      frame.src ||
+      frame.getAttribute('src') ||
+      frame.getAttribute('data-src') ||
+      frame.getAttribute('data-lazy-src') ||
+      frame.getAttribute('data-url') ||
+      ''
+    );
+  }
+
   function frameArea(frame) {
     if (!frame || typeof frame.getBoundingClientRect !== 'function') {
       return 0;
@@ -441,7 +456,7 @@ export const createRemotePointerScript = (): string => {
         );
       })
       .filter(function (frame) {
-        var src = frame.src || frame.getAttribute('src') || '';
+        var src = frameSource(frame);
         return Boolean(parseHttpsUrl(src)) && !isBlockedUrl(src);
       })
       .sort(function (a, b) {
@@ -451,16 +466,14 @@ export const createRemotePointerScript = (): string => {
     return candidates.length ? candidates[0] : null;
   }
 
-  function promoteEmbeddedPlayerAtPointer() {
-    var frame = embeddedPlayerAtPointer();
+  function promoteFrame(frame) {
     if (!frame) {
       return false;
     }
 
-    var src = frame.src || frame.getAttribute('src') || '';
-    var parsed = parseHttpsUrl(src);
+    var parsed = parseHttpsUrl(frameSource(frame));
 
-    if (!parsed) {
+    if (!parsed || isBlockedUrl(parsed.href)) {
       return false;
     }
 
@@ -482,6 +495,28 @@ export const createRemotePointerScript = (): string => {
     } catch (_) {}
 
     return false;
+  }
+
+  function promoteEmbeddedPlayerAtPointer() {
+    return promoteFrame(embeddedPlayerAtPointer());
+  }
+
+  function promoteLargestEmbeddedPlayer() {
+    var frames = Array.prototype.slice
+      .call(document.querySelectorAll('iframe'))
+      .filter(function (frame) {
+        var src = frameSource(frame);
+        return (
+          frameArea(frame) > 0 &&
+          Boolean(parseHttpsUrl(src)) &&
+          !isBlockedUrl(src)
+        );
+      })
+      .sort(function (a, b) {
+        return frameArea(b) - frameArea(a);
+      });
+
+    return frames.length ? promoteFrame(frames[0]) : false;
   }
 
   function activate() {
@@ -619,6 +654,7 @@ export const createRemotePointerScript = (): string => {
       setDirection: setDirection,
       activate: activate,
       promoteEmbeddedPlayerAtPointer: promoteEmbeddedPlayerAtPointer,
+      promoteLargestEmbeddedPlayer: promoteLargestEmbeddedPlayer,
       refresh: function () {
         ensureUiAttached();
         render();
