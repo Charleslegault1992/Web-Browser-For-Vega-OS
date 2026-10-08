@@ -10,7 +10,7 @@ export const createRemotePointerScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 7 }),
+    value: Object.freeze({ version: 8 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -720,6 +720,55 @@ export const createRemotePointerScript = (): string => {
     return false;
   }
 
+  function dismissTopmostPopupFrame(frame) {
+    if (
+      !frame ||
+      frame.tagName !== 'IFRAME'
+    ) {
+      return false;
+    }
+
+    try {
+      if (
+        window.__KAYLANE_TV_GUARD_API__ &&
+        typeof window.__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt === 'function'
+      ) {
+        return (
+          window.__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt(
+            x,
+            y,
+            true
+          ) === true
+        );
+      }
+    } catch (_) {}
+
+    return false;
+  }
+
+  function isNearTopRightOfFrame(frame) {
+    if (
+      !frame ||
+      frame.tagName !== 'IFRAME' ||
+      typeof frame.getBoundingClientRect !== 'function'
+    ) {
+      return false;
+    }
+
+    var rect = frame.getBoundingClientRect();
+    if (rect.width < 120 || rect.height < 80) {
+      return false;
+    }
+
+    var localX = x - rect.left;
+    var localY = y - rect.top;
+
+    return (
+      localX >= rect.width * 0.68 &&
+      localY <= Math.max(90, rect.height * 0.30)
+    );
+  }
+
   function toggleMedia(target) {
     var media = null;
 
@@ -798,6 +847,16 @@ export const createRemotePointerScript = (): string => {
       hit.tagName === 'IFRAME' &&
       frameArea(hit) > 0
     ) {
+      // A close X inside a cross-origin iframe is invisible to the parent DOM.
+      // If the pointer is in the iframe's top-right close zone, dismiss and
+      // quarantine that popup frame instead of isolating it as a player.
+      if (
+        isNearTopRightOfFrame(hit) &&
+        dismissTopmostPopupFrame(hit)
+      ) {
+        return;
+      }
+
       armPlaybackShield();
       promoteFrame(hit);
       return;
