@@ -3,9 +3,9 @@ import {createRemotePointerScript} from './remotePointer';
 describe('createRemotePointerScript', () => {
   const script = createRemotePointerScript();
 
-  it('is idempotent and exposes the v7 pointer API', () => {
+  it('is idempotent and exposes the v8 pointer API', () => {
     expect(script).toContain('window.__KAYLANE_TV_POINTER__');
-    expect(script).toContain('version: 7');
+    expect(script).toContain('version: 8');
     expect(script).toContain('window, \'__KAYLANE_TV_POINTER_API__\'');
     expect(script).toContain('setMode: setMode');
     expect(script).toContain('setDirection: setDirection');
@@ -74,10 +74,18 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain('__KAYLANE_TV_GUARD_API__.closePopupAt');
   });
 
+  it('dismisses a popup iframe close-corner before considering player promotion', () => {
+    expect(script).toContain('function isNearTopRightOfFrame(frame)');
+    expect(script).toContain('function dismissTopmostPopupFrame(frame)');
+    expect(script).toContain('__KAYLANE_TV_GUARD_API__.dismissPopupFrameAt');
+    expect(script).toContain('isNearTopRightOfFrame(hit)');
+    expect(script).toContain('dismissTopmostPopupFrame(hit)');
+    expect(script).toContain('promoteFrame(hit)');
+  });
+
   it('promotes an iframe only when that iframe is the topmost hit target', () => {
     expect(script).toContain("hit.tagName === 'IFRAME'");
     expect(script).toContain('frameArea(hit) > 0');
-    expect(script).toContain('promoteFrame(hit)');
     expect(script).toContain(
       'Only promote when the iframe itself is the TOPMOST hit target',
     );
