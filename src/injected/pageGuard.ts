@@ -14,7 +14,7 @@ export const createPageGuardScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_GUARD__', {
-    value: Object.freeze({ version: 9 }),
+    value: Object.freeze({ version: 10 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -26,6 +26,7 @@ export const createPageGuardScript = (): string => {
   var playbackShieldUntil = 0;
   var PLAYBACK_SHIELD_MS = 20000;
   var MAX_MODAL_SCAN = 40;
+  var MAX_ADDED_NODE_SCAN = 60;
 
   function normalizeHost(host) {
     return String(host || '').trim().toLowerCase().replace(/\\.+$/, '');
@@ -375,10 +376,14 @@ export const createPageGuardScript = (): string => {
   }
 
   function isPlayerUiSurface(node) {
-    var ownDescriptor = nodeDescriptor(node);
+    if (!node || node.nodeType !== 1) {
+      return false;
+    }
+
+    var descriptor = nodeDescriptor(node);
 
     if (
-      hasAnyToken(ownDescriptor, [
+      hasAnyToken(descriptor, [
         'advert',
         'sponsor',
         'promo',
@@ -392,33 +397,53 @@ export const createPageGuardScript = (): string => {
       return false;
     }
 
-    var current = node;
-    var depth = 0;
+    if (
+      node.matches &&
+      node.matches('video,audio')
+    ) {
+      return true;
+    }
 
-    while (current && depth < 5) {
-      var descriptor = nodeDescriptor(current);
+    if (
+      hasAnyToken(descriptor, [
+        'media-control',
+        'controls',
+        'play-button',
+        'pause-button',
+        'volume',
+        'seek',
+        'progress',
+        'fullscreen',
+        'subtitle',
+        'caption',
+        'playback-control'
+      ])
+    ) {
+      return true;
+    }
 
-      if (
-        hasAnyToken(descriptor, [
-          'player',
-          'video',
-          'media-control',
-          'controls',
-          'playback'
-        ])
-      ) {
+    if (
+      hasAnyToken(descriptor, ['player', 'video']) &&
+      node.querySelector &&
+      node.querySelector('video,audio')
+    ) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function containsLargePlayerFrame(node) {
+    if (!node || !node.querySelectorAll) {
+      return false;
+    }
+
+    var frames = node.querySelectorAll('iframe');
+
+    for (var index = 0; index < frames.length; index += 1) {
+      if (elementCoverage(frames[index]) >= 0.08) {
         return true;
       }
-
-      if (
-        current.matches &&
-        current.matches('video,audio')
-      ) {
-        return true;
-      }
-
-      current = current.parentElement;
-      depth += 1;
     }
 
     return false;
@@ -458,7 +483,7 @@ export const createPageGuardScript = (): string => {
     ]);
   }
 
-  function isLikelyPlaybackModal(node) {
+  function isLikelyPlaybackModal(node, aggressive) {
     if (
       !isPlaybackShieldActive() ||
       !isTopDocument() ||
@@ -505,18 +530,38 @@ export const createPageGuardScript = (): string => {
       position === 'sticky' ||
       position === 'absolute';
 
-    if (!overlayPosition) {
+    if (!overlayPosition || coverage <= 0) {
       return false;
     }
 
-    if (modalSignal && coverage >= 0.025 && zIndex >= 10) {
+    if (
+      node.tagName === 'IFRAME' &&
+      coverage >= 0.08 &&
+      !nodeHasBlockedHost(node)
+    ) {
+      return false;
+    }
+
+    if (containsLargePlayerFrame(node)) {
+      return false;
+    }
+
+    if (modalSignal && coverage >= 0.012 && zIndex >= 0) {
+      return true;
+    }
+
+    if (
+      aggressive === true &&
+      !isPlayerUiSurface(node) &&
+      coverage >= 0.012
+    ) {
       return true;
     }
 
     if (
       !isPlayerUiSurface(node) &&
-      coverage >= 0.10 &&
-      zIndex >= 40
+      coverage >= 0.08 &&
+      zIndex >= 20
     ) {
       return true;
     }
@@ -548,7 +593,7 @@ export const createPageGuardScript = (): string => {
     } catch (_) {}
   }
 
-  function removePlaybackModal(node) {
+  function removePlaybackModal(node, aggressive) {
     var current = node;
     var depth = 0;
 
@@ -558,7 +603,7 @@ export const createPageGuardScript = (): string => {
       current !== document.documentElement &&
       depth < 6
     ) {
-      if (isLikelyPlaybackModal(current)) {
+      if (isLikelyPlaybackModal(current, aggressive)) {
         current.remove();
         restorePageAfterModalRemoval();
         return true;
@@ -569,6 +614,49 @@ export const createPageGuardScript = (): string => {
     }
 
     return false;
+  }
+
+  function sweepAddedOverlayTree(root) {
+    if (
+      !isPlaybackShieldActive() ||
+      !root ||
+      root.nodeType !== 1
+    ) {
+      return 0;
+    }
+
+    var removed = 0;
+
+    if (removePlaybackModal(root, true)) {
+      return 1;
+    }
+
+    if (!root.querySelectorAll) {
+      return 0;
+    }
+
+    var candidates;
+
+    try {
+      candidates = root.querySelectorAll(
+        'div,section,aside,a,iframe,dialog'
+      );
+    } catch (_) {
+      return 0;
+    }
+
+    for (
+      var index = 0;
+      index < candidates.length &&
+      index < MAX_ADDED_NODE_SCAN;
+      index += 1
+    ) {
+      if (removePlaybackModal(candidates[index], true)) {
+        removed += 1;
+      }
+    }
+
+    return removed;
   }
 
   function sweepPlaybackModals(root) {
@@ -611,7 +699,7 @@ export const createPageGuardScript = (): string => {
       index < MAX_MODAL_SCAN;
       index += 1
     ) {
-      if (removePlaybackModal(candidates[index])) {
+      if (removePlaybackModal(candidates[index], false)) {
         removed += 1;
       }
     }
@@ -972,12 +1060,16 @@ export const createPageGuardScript = (): string => {
     return false;
   }
 
-  function cleanNode(node) {
+  function cleanNode(node, aggressive) {
     if (!node || node.nodeType !== 1) {
       return;
     }
 
-    if (removePlaybackModal(node)) {
+    if (aggressive === true && sweepAddedOverlayTree(node) > 0) {
+      return;
+    }
+
+    if (removePlaybackModal(node, aggressive === true)) {
       return;
     }
 
@@ -1018,11 +1110,13 @@ export const createPageGuardScript = (): string => {
   var observer = new MutationObserver(function (mutations) {
     mutations.forEach(function (mutation) {
       if (mutation.type === 'attributes') {
-        cleanNode(mutation.target);
+        cleanNode(mutation.target, true);
         return;
       }
 
-      mutation.addedNodes.forEach(cleanNode);
+      mutation.addedNodes.forEach(function (node) {
+        cleanNode(node, true);
+      });
     });
   });
 
