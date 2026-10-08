@@ -116,13 +116,17 @@ describe('createPageGuardScript', () => {
     expect(script).toContain("'mirror'");
     expect(script).toContain("'lecteur'");
     expect(script).toContain('interactiveCount >= 2');
+    expect(script).toContain('!nodeHasBlockedHost(current)');
+    expect(script).toContain('!nodeHasExternalEscape(current)');
     expect(script).toContain('isSourceSelectionSurface(node)');
   });
 
   it('does not arm the aggressive shield from generic player wrappers on primary pages', () => {
     expect(script).toContain("target.closest('video,audio,iframe')");
     expect(script).toContain("!isPrimaryHost(window.location.hostname)");
-    expect(script).toContain("target.closest(\n          '[class*=\"player\"],[id*=\"player\"],[class*=\"video\"],[id*=\"video\"]'");
+    expect(script).toContain(
+      "'[class*=\"player\"],[id*=\"player\"],[class*=\"video\"],[id*=\"video\"]'",
+    );
     expect(script).not.toContain("playerTarget || visibleMediaCoverage() >= 0.08");
   });
 
