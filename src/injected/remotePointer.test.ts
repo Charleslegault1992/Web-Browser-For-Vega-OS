@@ -29,7 +29,9 @@ describe('createRemotePointerScript', () => {
     expect(script).toContain("nextMode === 'focus' ? 'focus' : 'pointer'");
     expect(script).toContain("mode === 'pointer' ? 'focus' : 'pointer'");
     expect(script).toContain("cursor.style.display = mode === 'pointer' ? 'block' : 'none'");
-    expect(script).toContain('Maintiens OK');
+    expect(script).toContain('Mode pointeur');
+    expect(script).toContain('Mode sélection');
+    expect(script).toContain("modeBadge.style.opacity = '0'");
   });
 
   it('uses a frame-timed velocity model for smooth movement', () => {
