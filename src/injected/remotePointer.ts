@@ -10,7 +10,7 @@ export const createRemotePointerScript = (): string => {
   }
 
   Object.defineProperty(window, '__KAYLANE_TV_POINTER__', {
-    value: Object.freeze({ version: 5 }),
+    value: Object.freeze({ version: 6 }),
     configurable: false,
     enumerable: false,
     writable: false
@@ -589,7 +589,12 @@ export const createRemotePointerScript = (): string => {
         return frameArea(b) - frameArea(a);
       });
 
-    return frames.length ? promoteFrame(frames[0]) : false;
+    if (!frames.length) {
+      return false;
+    }
+
+    armPlaybackShield();
+    return promoteFrame(frames[0]);
   }
 
   function armPlaybackShield() {
@@ -610,13 +615,9 @@ export const createRemotePointerScript = (): string => {
 
     createCursor();
 
-    var embeddedFrame = embeddedPlayerAtPointer();
-    if (embeddedFrame) {
-      armPlaybackShield();
-      promoteFrame(embeddedFrame);
-      return;
-    }
-
+    // OK must always activate the topmost element under the visible pointer.
+    // Do not auto-promote any iframe found underneath it: source/server
+    // controls can visually sit above a player iframe on Movix.
     var target = elementAtPointer();
     if (!target || target === cursor || target === modeBadge) {
       return;
